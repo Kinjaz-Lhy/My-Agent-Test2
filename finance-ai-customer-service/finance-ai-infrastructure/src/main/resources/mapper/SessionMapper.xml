@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 会话 Mapper XML 映射 -->
+<mapper namespace="com.company.finance.infrastructure.mapper.SessionMapper">
+
+    <!-- 结果映射：数据库列名（下划线）→ Java 字段名（驼峰） -->
+    <resultMap id="sessionResultMap" type="com.company.finance.domain.entity.Session">
+        <id property="sessionId" column="session_id"/>
+        <result property="employeeId" column="employee_id"/>
+        <result property="departmentId" column="department_id"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="closedAt" column="closed_at"/>
+        <!-- context_json 以 String 形式映射，上层服务负责反序列化为 Map -->
+    </resultMap>
+
+    <!-- 插入会话记录 -->
+    <insert id="insert">
+        INSERT INTO t_session (session_id, employee_id, department_id, status, context_json, created_at, updated_at, closed_at)
+        VALUES (#{session.sessionId}, #{session.employeeId}, #{session.departmentId},
+                #{session.status}, #{contextJson},
+                #{session.createdAt}, #{session.updatedAt}, #{session.closedAt})
+    </insert>
+
+    <!-- 根据会话 ID 查询 -->
+    <select id="selectById" resultMap="sessionResultMap">
+        SELECT session_id, employee_id, department_id, status, context_json, created_at, updated_at, closed_at
+        FROM t_session
+        WHERE session_id = #{sessionId}
+    </select>
+
+    <!-- 根据员工 ID 查询会话列表（按创建时间降序） -->
+    <select id="selectByEmployeeId" resultMap="sessionResultMap">
+        SELECT session_id, employee_id, department_id, status, context_json, created_at, updated_at, closed_at
+        FROM t_session
+        WHERE employee_id = #{employeeId}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 更新会话状态 -->
+    <update id="updateStatus">
+        UPDATE t_session
+        SET status = #{status}, updated_at = NOW()
+        WHERE session_id = #{sessionId}
+    </update>
+
+</mapper>

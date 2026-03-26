@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 满意度反馈 Mapper XML 映射 -->
+<mapper namespace="com.company.finance.infrastructure.mapper.SatisfactionFeedbackMapper">
+
+    <!-- 结果映射：数据库列名（下划线）→ Java 字段名（驼峰） -->
+    <resultMap id="satisfactionFeedbackResultMap" type="com.company.finance.domain.entity.SatisfactionFeedback">
+        <id property="feedbackId" column="feedback_id"/>
+        <result property="sessionId" column="session_id"/>
+        <result property="employeeId" column="employee_id"/>
+        <result property="score" column="score"/>
+        <result property="comment" column="comment"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <!-- 插入满意度反馈 -->
+    <insert id="insert">
+        INSERT INTO t_satisfaction_feedback (feedback_id, session_id, employee_id, score, comment, created_at)
+        VALUES (#{feedbackId}, #{sessionId}, #{employeeId}, #{score}, #{comment}, #{createdAt})
+    </insert>
+
+    <!-- 查询指定日期范围内的平均满意度评分 -->
+    <select id="selectAvgScoreByDateRange" resultType="java.lang.Double">
+        SELECT AVG(score)
+        FROM t_satisfaction_feedback
+        WHERE created_at &gt;= #{start} AND created_at &lt;= #{end}
+    </select>
+
+</mapper>

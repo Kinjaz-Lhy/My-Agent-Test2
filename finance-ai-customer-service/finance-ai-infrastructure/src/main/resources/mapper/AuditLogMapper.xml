@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 审计日志 Mapper XML 映射 -->
+<mapper namespace="com.company.finance.infrastructure.mapper.AuditLogMapper">
+
+    <!-- 结果映射：数据库列名（下划线）→ Java 字段名（驼峰） -->
+    <resultMap id="auditLogResultMap" type="com.company.finance.domain.entity.AuditLog">
+        <id property="logId" column="log_id"/>
+        <result property="sessionId" column="session_id"/>
+        <result property="employeeId" column="employee_id"/>
+        <result property="action" column="action"/>
+        <result property="requestContent" column="request_content"/>
+        <result property="responseContent" column="response_content"/>
+        <result property="maskedResponseContent" column="masked_response_content"/>
+        <result property="timestamp" column="timestamp"/>
+    </resultMap>
+
+    <!-- 插入审计日志 -->
+    <insert id="insert">
+        INSERT INTO t_audit_log (log_id, session_id, employee_id, action, request_content, response_content, masked_response_content, timestamp)
+        VALUES (#{logId}, #{sessionId}, #{employeeId}, #{action},
+                #{requestContent}, #{responseContent}, #{maskedResponseContent}, #{timestamp})
+    </insert>
+
+    <!-- 多条件组合查询审计日志（动态 SQL） -->
+    <select id="selectByCondition" resultMap="auditLogResultMap">
+        SELECT log_id, session_id, employee_id, action, request_content, response_content, masked_response_content, timestamp
+        FROM t_audit_log
+        <where>
+            <if test="query.startTime != null">
+                AND timestamp &gt;= #{query.startTime}
+            </if>
+            <if test="query.endTime != null">
+                AND timestamp &lt;= #{query.endTime}
+            </if>
+            <if test="query.employeeId != null and query.employeeId != ''">
+                AND employee_id = #{query.employeeId}
+            </if>
+            <if test="query.intent != null and query.intent != ''">
+                AND action = #{query.intent}
+            </if>
+            <if test="query.sessionId != null and query.sessionId != ''">
+                AND session_id = #{query.sessionId}
+            </if>
+        </where>
+        ORDER BY timestamp DESC
+    </select>
+
+</mapper>

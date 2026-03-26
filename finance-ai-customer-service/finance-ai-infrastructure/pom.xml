@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.company.finance</groupId>
+        <artifactId>finance-ai-customer-service</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <!-- 基础设施层：MyBatis Mapper、外部系统客户端 -->
+    <artifactId>finance-ai-infrastructure</artifactId>
+    <name>基础设施层</name>
+    <description>MyBatis 数据访问、外部系统客户端实现</description>
+
+    <dependencies>
+        <!-- 依赖领域层 -->
+        <dependency>
+            <groupId>com.company.finance</groupId>
+            <artifactId>finance-ai-domain</artifactId>
+        </dependency>
+
+        <!-- 依赖公共模块 -->
+        <dependency>
+            <groupId>com.company.finance</groupId>
+            <artifactId>finance-ai-common</artifactId>
+        </dependency>
+
+        <!-- AI-Nova 核心依赖（ChatMemoryStore 接口） -->
+        <dependency>
+            <groupId>com.kingdee</groupId>
+            <artifactId>ai-nova-core</artifactId>
+        </dependency>
+
+        <!-- MyBatis + Spring Boot 集成 -->
+        <dependency>
+            <groupId>org.mybatis.spring.boot</groupId>
+            <artifactId>mybatis-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- MySQL 驱动 -->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Flyway 数据库迁移 -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+        </dependency>
+
+        <!-- Spring WebFlux（用于响应式 HTTP 客户端） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!-- Spring Boot 自动配置 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- Spring Boot 测试 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- H2 内存数据库（测试用） -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

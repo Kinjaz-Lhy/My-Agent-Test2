@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.company.finance</groupId>
+        <artifactId>finance-ai-customer-service</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <!-- 服务层：业务编排、会话管理 -->
+    <artifactId>finance-ai-service</artifactId>
+    <name>服务层</name>
+    <description>业务编排、会话管理、运营统计、知识库服务</description>
+
+    <dependencies>
+        <!-- 依赖公共模块（常量、DTO） -->
+        <dependency>
+            <groupId>com.company.finance</groupId>
+            <artifactId>finance-ai-common</artifactId>
+        </dependency>
+
+        <!-- 依赖 AI 能力层 -->
+        <dependency>
+            <groupId>com.company.finance</groupId>
+            <artifactId>finance-ai-agent</artifactId>
+        </dependency>
+
+        <!-- 依赖领域层 -->
+        <dependency>
+            <groupId>com.company.finance</groupId>
+            <artifactId>finance-ai-domain</artifactId>
+        </dependency>
+
+        <!-- 依赖基础设施层 -->
+        <dependency>
+            <groupId>com.company.finance</groupId>
+            <artifactId>finance-ai-infrastructure</artifactId>
+        </dependency>
+
+        <!-- AI-Nova 核心（ChatClient、Advisor） -->
+        <dependency>
+            <groupId>com.kingdee</groupId>
+            <artifactId>ai-nova-core</artifactId>
+        </dependency>
+
+        <!-- Spring WebFlux（响应式编程） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!-- Spring Boot 自动配置 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- Spring Boot 测试 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

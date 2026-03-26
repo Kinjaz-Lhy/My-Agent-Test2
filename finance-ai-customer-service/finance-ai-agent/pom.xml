@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.company.finance</groupId>
+        <artifactId>finance-ai-customer-service</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <!-- AI 能力层：Agent、Tool、Skill 定义 -->
+    <artifactId>finance-ai-agent</artifactId>
+    <name>AI 能力层</name>
+    <description>智能体定义、业务工具、Skills 知识文件</description>
+
+    <dependencies>
+        <!-- 依赖领域层 -->
+        <dependency>
+            <groupId>com.company.finance</groupId>
+            <artifactId>finance-ai-domain</artifactId>
+        </dependency>
+
+        <!-- 依赖公共模块 -->
+        <dependency>
+            <groupId>com.company.finance</groupId>
+            <artifactId>finance-ai-common</artifactId>
+        </dependency>
+
+        <!-- AI-Nova 框架：Agent 能力 -->
+        <dependency>
+            <groupId>com.kingdee</groupId>
+            <artifactId>ai-nova-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.kingdee</groupId>
+            <artifactId>ai-nova-agent</artifactId>
+        </dependency>
+
+        <!-- Spring 上下文（用于依赖注入） -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+
+        <!-- Spring Boot 测试 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

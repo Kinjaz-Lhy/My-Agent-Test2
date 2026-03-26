@@ -1,0 +1,9 @@
+*.log
+docs/
+.kiro/
+.vscode/
+*.class
+*.lst
+finance-ai-customer-service/finance-ai-api/target/
+**/target/
+*.jqwik-database

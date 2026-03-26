@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 知识条目 Mapper XML 映射 -->
+<mapper namespace="com.company.finance.infrastructure.mapper.KnowledgeEntryMapper">
+
+    <!-- 结果映射：数据库列名（下划线）→ Java 字段名（驼峰） -->
+    <resultMap id="knowledgeEntryResultMap" type="com.company.finance.domain.entity.KnowledgeEntry">
+        <id property="entryId" column="entry_id"/>
+        <result property="category" column="category"/>
+        <result property="title" column="title"/>
+        <result property="content" column="content"/>
+        <result property="status" column="status"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="reviewedBy" column="reviewed_by"/>
+        <result property="effectiveAt" column="effective_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <!-- 查询指定分类下状态为 ACTIVE 的知识条目 -->
+    <select id="selectActiveByCategory" resultMap="knowledgeEntryResultMap">
+        SELECT entry_id, category, title, content, status, created_by, reviewed_by, effective_at, created_at, updated_at
+        FROM t_knowledge_entry
+        WHERE category = #{category} AND status = 'ACTIVE'
+        ORDER BY updated_at DESC
+    </select>
+
+    <!-- 更新知识条目状态 -->
+    <update id="updateStatus">
+        UPDATE t_knowledge_entry
+        SET status = #{status}, updated_at = NOW()
+        WHERE entry_id = #{entryId}
+    </update>
+
+    <!-- 插入知识条目 -->
+    <insert id="insert">
+        INSERT INTO t_knowledge_entry (entry_id, category, title, content, status, created_by, reviewed_by, effective_at, created_at, updated_at)
+        VALUES (#{entryId}, #{category}, #{title}, #{content}, #{status},
+                #{createdBy}, #{reviewedBy}, #{effectiveAt}, #{createdAt}, #{updatedAt})
+    </insert>
+
+</mapper>

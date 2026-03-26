@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 运营指标 Mapper XML 映射 -->
+<mapper namespace="com.company.finance.infrastructure.mapper.OperationMetricsMapper">
+
+    <!-- 结果映射：数据库列名（下划线）→ Java 字段名（驼峰） -->
+    <resultMap id="operationMetricsResultMap" type="com.company.finance.domain.entity.OperationMetrics">
+        <id property="metricId" column="metric_id"/>
+        <result property="date" column="metric_date"/>
+        <result property="totalSessions" column="total_sessions"/>
+        <result property="selfResolvedSessions" column="self_resolved_sessions"/>
+        <result property="humanHandoffSessions" column="human_handoff_sessions"/>
+        <result property="avgResponseTimeMs" column="avg_response_time_ms"/>
+        <result property="satisfactionScore" column="satisfaction_score"/>
+        <!-- hot_topics_json 以 String 形式映射，上层服务负责反序列化为 Map -->
+    </resultMap>
+
+    <!-- 插入或更新运营指标（基于 metric_date 唯一键，使用 ON DUPLICATE KEY UPDATE） -->
+    <insert id="insertOrUpdate">
+        INSERT INTO t_operation_metrics (metric_id, metric_date, total_sessions, self_resolved_sessions,
+                                         human_handoff_sessions, avg_response_time_ms, satisfaction_score, hot_topics_json)
+        VALUES (#{metrics.metricId}, #{metrics.date}, #{metrics.totalSessions}, #{metrics.selfResolvedSessions},
+                #{metrics.humanHandoffSessions}, #{metrics.avgResponseTimeMs}, #{metrics.satisfactionScore}, #{hotTopicsJson})
+        ON DUPLICATE KEY UPDATE
+            total_sessions = VALUES(total_sessions),
+            self_resolved_sessions = VALUES(self_resolved_sessions),
+            human_handoff_sessions = VALUES(human_handoff_sessions),
+            avg_response_time_ms = VALUES(avg_response_time_ms),
+            satisfaction_score = VALUES(satisfaction_score),
+            hot_topics_json = VALUES(hot_topics_json)
+    </insert>
+
+    <!-- 根据日期查询运营指标 -->
+    <select id="selectByDate" resultMap="operationMetricsResultMap">
+        SELECT metric_id, metric_date, total_sessions, self_resolved_sessions, human_handoff_sessions,
+               avg_response_time_ms, satisfaction_score, hot_topics_json
+        FROM t_operation_metrics
+        WHERE metric_date = #{date}
+    </select>
+
+    <!-- 根据日期范围查询运营指标列表 -->
+    <select id="selectByDateRange" resultMap="operationMetricsResultMap">
+        SELECT metric_id, metric_date, total_sessions, self_resolved_sessions, human_handoff_sessions,
+               avg_response_time_ms, satisfaction_score, hot_topics_json
+        FROM t_operation_metrics
+        WHERE metric_date &gt;= #{start} AND metric_date &lt;= #{end}
+        ORDER BY metric_date ASC
+    </select>
+
+</mapper>
