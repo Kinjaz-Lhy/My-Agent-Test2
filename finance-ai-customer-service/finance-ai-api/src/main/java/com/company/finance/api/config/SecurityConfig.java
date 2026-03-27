@@ -3,6 +3,7 @@ package com.company.finance.api.config;
 import com.company.finance.api.security.UserPrincipal;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
  */
 @Configuration
 @EnableWebFluxSecurity
+@Profile("!dev")
 public class SecurityConfig {
 
     /**

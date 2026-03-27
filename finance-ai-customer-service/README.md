@@ -44,19 +44,19 @@ mysql -u root -p finance_ai < finance-ai-infrastructure/src/main/resources/db/mi
 
 配置文件位于 `finance-ai-api/src/main/resources/application.yml`，支持环境变量覆盖：
 
-| 配置项 | 环境变量 | 默认值 | 说明 |
-|--------|---------|--------|------|
-| 数据库用户名 | `DB_USERNAME` | root | MySQL 用户名 |
-| 数据库密码 | `DB_PASSWORD` | root | MySQL 密码 |
-| SSO Issuer URI | `SSO_ISSUER_URI` | https://sso.company.com/... | 企业 SSO 认证地址 |
-| SSO JWK Set URI | `SSO_JWK_SET_URI` | https://sso.company.com/... | JWT 公钥地址 |
-| AI 模型地址 | `AI_MODEL_BASE_URL` | https://ai-nova.company.com/api | AI-Nova 模型 API |
-| AI 模型 Key | `AI_MODEL_API_KEY` | your-api-key | 模型 API Key |
-| AI 模型名称 | `AI_MODEL_NAME` | deepseek-chat | 使用的模型 |
-| 财务共享平台 | `FSS_PLATFORM_URL` | https://fss.company.com/api | FSS 平台地址 |
-| ERP 系统 | `ERP_URL` | https://erp.company.com/api | ERP 系统地址 |
-| 税务接口 | `TAX_URL` | https://tax.company.com/api | 税务验真接口 |
-| HR 系统 | `HR_URL` | https://hr.company.com/api | HR 系统地址 |
+| 配置项　　　　　| 环境变量　　　　　　| 默认值　　　　　　　　　　　　　| 说明　　　　　　　|
+| -----------------| ---------------------| ---------------------------------| -------------------|
+| 数据库用户名　　| `DB_USERNAME`　　　 | root　　　　　　　　　　　　　　| MySQL 用户名　　　|
+| 数据库密码　　　| `DB_PASSWORD`　　　 | root　　　　　　　　　　　　　　| MySQL 密码　　　　|
+| SSO Issuer URI　| `SSO_ISSUER_URI`　　| https://sso.company.com/...　　 | 企业 SSO 认证地址 |
+| SSO JWK Set URI | `SSO_JWK_SET_URI`　 | https://sso.company.com/...　　 | JWT 公钥地址　　　|
+| AI 模型地址　　 | `AI_MODEL_BASE_URL` | https://ai-nova.company.com/api | AI-Nova 模型 API　|
+| AI 模型 Key　　 | `AI_MODEL_API_KEY`　| your-api-key　　　　　　　　　　| 模型 API Key　　　|
+| AI 模型名称　　 | `AI_MODEL_NAME`　　 | deepseek-chat　　　　　　　　　 | 使用的模型　　　　|
+| 财务共享平台　　| `FSS_PLATFORM_URL`　| https://fss.company.com/api　　 | FSS 平台地址　　　|
+| ERP 系统　　　　| `ERP_URL`　　　　　 | https://erp.company.com/api　　 | ERP 系统地址　　　|
+| 税务接口　　　　| `TAX_URL`　　　　　 | https://tax.company.com/api　　 | 税务验真接口　　　|
+| HR 系统　　　　 | `HR_URL`　　　　　　| https://hr.company.com/api　　　| HR 系统地址　　　 |
 
 ## 五、启动后端
 

@@ -26,6 +26,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import javax.validation.Valid;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -53,6 +54,12 @@ public class ChatController {
         this.humanHandoffService = humanHandoffService;
     }
 
+    /** Dev 模式下 user 可能为 null，返回默认 UserPrincipal */
+    private UserPrincipal resolveUser(UserPrincipal user) {
+        if (user != null) return user;
+        return new UserPrincipal("dev-user", "DEPT-DEV", Collections.singletonList("ROLE_OPERATOR"));
+    }
+
     /**
      * SSE 流式对话端点
      * <p>
@@ -68,8 +75,9 @@ public class ChatController {
     public Flux<ServerSentEvent<ChatStreamResponse>> streamChat(
             @Valid @RequestBody ChatRequest request,
             @AuthenticationPrincipal UserPrincipal user) {
+        UserPrincipal u = resolveUser(user);
         return conversationService.streamChat(
-                user.getEmployeeId(),
+                u.getEmployeeId(),
                 request.getSessionId(),
                 request.getMessage()
         );
@@ -84,7 +92,8 @@ public class ChatController {
     @GetMapping("/sessions")
     public Mono<ResponseEntity<List<Session>>> getSessions(
             @AuthenticationPrincipal UserPrincipal user) {
-        List<Session> sessions = conversationService.getSessionsByEmployee(user.getEmployeeId());
+        UserPrincipal u = resolveUser(user);
+        List<Session> sessions = conversationService.getSessionsByEmployee(u.getEmployeeId());
         return Mono.just(ResponseEntity.ok(sessions));
     }
 
@@ -152,9 +161,10 @@ public class ChatController {
             @PathVariable String sessionId,
             @Valid @RequestBody FeedbackRequest request,
             @AuthenticationPrincipal UserPrincipal user) {
+        UserPrincipal u = resolveUser(user);
         SatisfactionFeedback feedback = satisfactionFeedbackService.submitFeedback(
                 sessionId,
-                user.getEmployeeId(),
+                u.getEmployeeId(),
                 request.getScore(),
                 request.getComment()
         );
