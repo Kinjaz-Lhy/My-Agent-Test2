@@ -47,9 +47,9 @@ mybatis:
 # ==================== AI 模型配置 ====================
 ai:
   model:
-    base-url: ${AI_MODEL_BASE_URL:https://ai-nova.company.com/api}
-    api-key: ${AI_MODEL_API_KEY:your-api-key}
-    name: ${AI_MODEL_NAME:deepseek-chat}
+    base-url: ${AI_MODEL_BASE_URL:https://open.bigmodel.cn/api/paas/v4/}
+    api-key: ${AI_MODEL_API_KEY:9a713e7059f84886a54f505ee6430cd0.oC4CTUBOboGmRmrF}
+    name: ${AI_MODEL_NAME:GLM-4.7-Flash}
     temperature: 0.7
     max-tokens: 2048
 

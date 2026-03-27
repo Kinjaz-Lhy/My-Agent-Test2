@@ -1,5 +1,6 @@
 package com.company.finance.agent;
 
+import kd.ai.nova.graph.CompileConfig;
 import kd.ai.nova.graph.agent.Agent;
 import kd.ai.nova.graph.agent.ReactAgent;
 import kd.ai.nova.graph.agent.flow.agent.SupervisorAgent;
@@ -42,6 +43,8 @@ public class SupervisorAgentConfig {
             + "- 如果无法匹配任何智能体，告知用户并建议转接人工客服\n\n"
             + "注意事项：\n"
             + "- 每次只调度一个最合适的智能体\n"
+            + "- 当子智能体返回结果后，直接将结果回复给用户，不要再次调度\n"
+            + "- 如果子智能体已经给出了完整回答，任务即完成，无需继续调度\n"
             + "- 使用中文与用户交流";
 
     /**
@@ -65,6 +68,7 @@ public class SupervisorAgentConfig {
                 .model(chatModel)
                 .subAgents(Arrays.<Agent>asList(expenseAgent, invoiceAgent, salaryAgent, supplierAgent, guideAgent))
                 .instruction(SUPERVISOR_INSTRUCTION)
+                .compileConfig(CompileConfig.builder().recursionLimit(10).build())
                 .build();
     }
 }

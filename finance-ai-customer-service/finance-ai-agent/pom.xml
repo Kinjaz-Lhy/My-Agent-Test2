@@ -64,6 +64,13 @@
             <version>1.12.3</version>
         </dependency>
 
+        <!-- OpenTelemetry Context（AI-Nova 运行时依赖） -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-context</artifactId>
+            <version>1.35.0</version>
+        </dependency>
+
         <!-- Spring 上下文（用于依赖注入） -->
         <dependency>
             <groupId>org.springframework</groupId>
