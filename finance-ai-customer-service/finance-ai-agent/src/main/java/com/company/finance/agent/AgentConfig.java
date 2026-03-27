@@ -37,6 +37,7 @@ public class AgentConfig {
                 .model(chatModel)
                 .tools(ToolCallbacks.from(expenseQueryTool, expenseSubmitTool))
                 .instruction(EXPENSE_INSTRUCTION)
+                .outputKey("agent_output")
                 .saver(new MemorySaver())
                 .build();
     }
@@ -51,6 +52,7 @@ public class AgentConfig {
                 .model(chatModel)
                 .tools(ToolCallbacks.from(invoiceVerifyTool))
                 .instruction(INVOICE_INSTRUCTION)
+                .outputKey("agent_output")
                 .saver(new MemorySaver())
                 .build();
     }

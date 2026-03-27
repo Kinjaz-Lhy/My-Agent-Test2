@@ -61,7 +61,7 @@ public class ConversationService {
     private static final int HANDOFF_THRESHOLD = 3;
 
     /** 流式输出每个 SSE 事件的字符分块大小 */
-    private static final int STREAM_CHUNK_SIZE = 5;
+    private static final int STREAM_CHUNK_SIZE = 50;
 
     /** 系统提示词 */
     private static final String SYSTEM_PROMPT =
@@ -284,13 +284,54 @@ public class ConversationService {
         // 2. 持久化用户消息
         persistMessage(activeSessionId, MessageRole.USER, message, null);
 
-        // 3. 异步调用 SupervisorAgent 获取响应，然后流式输出
+        // 3. 先用 ChatClient 判断意图，闲聊直接回复，业务问题走 SupervisorAgent
         return Mono.fromCallable(new Callable<String>() {
                     @Override
                     public String call() throws Exception {
-                        // SupervisorAgent.invoke(String) 返回 Optional<OverAllState>
-                        Optional<OverAllState> result = supervisorAgent.invoke(message);
-                        return extractResponse(result);
+                        // 先尝试 SupervisorAgent 调度
+                        try {
+                            Optional<OverAllState> result = supervisorAgent.invoke(message);
+                            if (result.isPresent()) {
+                                Map<String, Object> data = result.get().data();
+                                if (data != null) {
+                                    // 从 agent_output 提取
+                                    Object agentOutput = data.get("agent_output");
+                                    if (agentOutput != null && !agentOutput.toString().isEmpty()) {
+                                        return agentOutput.toString();
+                                    }
+                                    // 从 messages 中找 AiMessage
+                                    Object msgs = data.get("messages");
+                                    if (msgs instanceof java.util.List) {
+                                        java.util.List<?> msgList = (java.util.List<?>) msgs;
+                                        for (int i = msgList.size() - 1; i >= 0; i--) {
+                                            Object msg = msgList.get(i);
+                                            if (msg != null && msg.getClass().getSimpleName().contains("AiMessage")) {
+                                                Object text = msg.getClass().getMethod("text").invoke(msg);
+                                                if (text != null && !text.toString().isEmpty()) {
+                                                    return text.toString();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.warn("SupervisorAgent 调用异常，回退到 ChatClient", e);
+                        }
+
+                        // SupervisorAgent 没有返回有效回复，用 ChatClient 直接对话
+                        log.info("SupervisorAgent 未返回有效回复，使用 ChatClient 直接对话");
+                        kd.ai.nova.core.model.chat.response.ChatResponse chatResponse = chatClient.request()
+                                .system(SYSTEM_PROMPT)
+                                .user(message)
+                                .call();
+                        if (chatResponse != null && chatResponse.aiMessage() != null) {
+                            String text = chatResponse.aiMessage().text();
+                            if (text != null && !text.isEmpty()) {
+                                return text;
+                            }
+                        }
+                        return "抱歉，系统暂时无法处理您的请求。";
                     }
                 })
                 .subscribeOn(Schedulers.boundedElastic())
@@ -364,27 +405,64 @@ public class ConversationService {
         }
         OverAllState state = result.get();
         Map<String, Object> data = state.data();
+        log.info("=== OverAllState data keys: {}", data != null ? data.keySet() : "null");
+        if (data != null) {
+            for (Map.Entry<String, Object> entry : data.entrySet()) {
+                Object val = entry.getValue();
+                if (val instanceof List) {
+                    List<?> list = (List<?>) val;
+                    log.info("  key='{}', type=List, size={}", entry.getKey(), list.size());
+                    for (int i = 0; i < list.size(); i++) {
+                        Object item = list.get(i);
+                        if (item != null) {
+                            log.info("    [{}] class={}, toString={}", i, item.getClass().getName(),
+                                    item.toString().length() > 200 ? item.toString().substring(0, 200) + "..." : item.toString());
+                        }
+                    }
+                } else {
+                    log.info("  key='{}', type={}, value={}", entry.getKey(),
+                            val != null ? val.getClass().getName() : "null",
+                            val != null ? (val.toString().length() > 200 ? val.toString().substring(0, 200) + "..." : val.toString()) : "null");
+                }
+            }
+        }
         if (data == null || data.isEmpty()) {
             return "抱歉，系统暂时无法处理您的请求。";
         }
-        // SupervisorAgent 返回的 OverAllState 中，尝试从常见键提取响应
+        // SupervisorAgent 返回的 OverAllState 中，尝试从 messages 提取最后一条 AI 响应
         Object messages = data.get("messages");
         if (messages instanceof List) {
             List<?> msgList = (List<?>) messages;
-            if (!msgList.isEmpty()) {
-                Object lastMsg = msgList.get(msgList.size() - 1);
-                if (lastMsg != null) {
-                    // AI-Nova ChatMessage 的 text() 方法返回消息文本
-                    try {
-                        java.lang.reflect.Method textMethod = lastMsg.getClass().getMethod("text");
-                        Object text = textMethod.invoke(lastMsg);
-                        if (text != null) {
+            // 从后往前找最后一条 AiMessage（跳过 UserMessage、ToolMessage 等）
+            for (int i = msgList.size() - 1; i >= 0; i--) {
+                Object msg = msgList.get(i);
+                if (msg == null) continue;
+                try {
+                    // 检查消息类型：AiMessage 的类名包含 "AiMessage"
+                    String className = msg.getClass().getSimpleName();
+                    if (className.contains("AiMessage")) {
+                        java.lang.reflect.Method textMethod = msg.getClass().getMethod("text");
+                        Object text = textMethod.invoke(msg);
+                        if (text != null && !text.toString().isEmpty()) {
                             return text.toString();
                         }
-                    } catch (Exception e) {
-                        // 回退到 toString
-                        return lastMsg.toString();
                     }
+                } catch (Exception e) {
+                    // ignore, try next
+                }
+            }
+            // 回退：如果没找到 AiMessage，取最后一条非空消息
+            for (int i = msgList.size() - 1; i >= 0; i--) {
+                Object msg = msgList.get(i);
+                if (msg == null) continue;
+                try {
+                    java.lang.reflect.Method textMethod = msg.getClass().getMethod("text");
+                    Object text = textMethod.invoke(msg);
+                    if (text != null && !text.toString().isEmpty()) {
+                        return text.toString();
+                    }
+                } catch (Exception e) {
+                    // ignore
                 }
             }
         }
