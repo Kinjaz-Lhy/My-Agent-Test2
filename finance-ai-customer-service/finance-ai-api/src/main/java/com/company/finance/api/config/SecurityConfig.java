@@ -50,6 +50,10 @@ public class SecurityConfig {
                 )
                 // 配置路径权限规则
                 .authorizeExchange(exchanges -> exchanges
+                        // 公开端点：健康检查、Actuator、静态资源
+                        .pathMatchers("/actuator/**", "/actuator/health/**").permitAll()
+                        .pathMatchers("/favicon.ico", "/error").permitAll()
+                        // 业务端点权限
                         .pathMatchers("/api/v1/admin/**").hasRole("OPERATOR")
                         .pathMatchers("/api/v1/chat/**").authenticated()
                         .pathMatchers("/api/v1/audit/**").hasRole("AUDITOR")
@@ -62,8 +66,7 @@ public class SecurityConfig {
      * JWT 认证转换器：从 JWT Token 中提取用户信息和角色，
      * 构建包含 UserPrincipal 的认证令牌。
      */
-    @Bean
-    public Converter<Jwt, Mono<AbstractAuthenticationToken>> jwtAuthenticationConverter() {
+    Converter<Jwt, Mono<AbstractAuthenticationToken>> jwtAuthenticationConverter() {
         return jwt -> {
             // 从 JWT claims 中提取角色列表
             Collection<GrantedAuthority> authorities = extractAuthorities(jwt);

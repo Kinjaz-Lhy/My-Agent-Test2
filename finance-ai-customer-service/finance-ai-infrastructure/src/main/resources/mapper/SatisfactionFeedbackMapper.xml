@@ -28,4 +28,12 @@
         WHERE created_at &gt;= #{start} AND created_at &lt;= #{end}
     </select>
 
+    <!-- 根据会话 ID 查询满意度反馈 -->
+    <select id="selectBySessionId" resultMap="satisfactionFeedbackResultMap">
+        SELECT feedback_id, session_id, employee_id, score, comment, created_at
+        FROM t_satisfaction_feedback
+        WHERE session_id = #{sessionId}
+        LIMIT 1
+    </select>
+
 </mapper>

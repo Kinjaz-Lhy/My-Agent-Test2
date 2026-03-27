@@ -20,6 +20,9 @@ import lombok.NoArgsConstructor;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ChatStreamResponse {
 
+    /** 会话 ID */
+    private String sessionId;
+
     /** 响应内容片段 */
     private String content;
 

@@ -1,0 +1,97 @@
+server:
+  port: 8080
+
+spring:
+  profiles:
+    active: dev
+  application:
+    name: finance-ai-customer-service
+
+  # ==================== 数据库配置 ====================
+  datasource:
+    url: jdbc:mysql://localhost:3306/finance_ai?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:1234abcd}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
+
+  # ==================== Spring Security / SSO 配置 ====================
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${SSO_ISSUER_URI:https://sso.company.com/auth/realms/finance}
+          jwk-set-uri: ${SSO_JWK_SET_URI:https://sso.company.com/auth/realms/finance/protocol/openid-connect/certs}
+
+  # ==================== Jackson 序列化配置 ====================
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+
+# ==================== MyBatis 配置 ====================
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.company.finance.domain.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# ==================== AI 模型配置 ====================
+ai:
+  model:
+    base-url: ${AI_MODEL_BASE_URL:https://ai-nova.company.com/api}
+    api-key: ${AI_MODEL_API_KEY:your-api-key}
+    name: ${AI_MODEL_NAME:deepseek-chat}
+    temperature: 0.7
+    max-tokens: 2048
+
+# ==================== 外部系统地址配置 ====================
+external:
+  fss-platform:
+    base-url: ${FSS_PLATFORM_URL:https://fss.company.com/api}
+    timeout-seconds: 10
+    max-retries: 3
+    retry-interval-seconds: 2
+  erp:
+    base-url: ${ERP_URL:https://erp.company.com/api}
+    timeout-seconds: 10
+    max-retries: 3
+    retry-interval-seconds: 2
+  tax:
+    base-url: ${TAX_URL:https://tax.company.com/api}
+    timeout-seconds: 10
+    max-retries: 3
+    retry-interval-seconds: 2
+  hr:
+    base-url: ${HR_URL:https://hr.company.com/api}
+    timeout-seconds: 10
+    max-retries: 3
+    retry-interval-seconds: 2
+
+# ==================== 业务配置 ====================
+business:
+  handoff:
+    threshold: 3
+    waiting-interval-seconds: 30
+  chat:
+    max-memory-messages: 100
+    stream-chunk-size: 5
+  operation:
+    hot-topics-limit: 20
+    self-resolve-rate-alert-threshold: 0.7
+
+# ==================== 日志配置 ====================
+logging:
+  level:
+    root: INFO
+    "[com.company.finance]": DEBUG
+    "[org.mybatis]": DEBUG
+    "[org.springframework.security]": INFO

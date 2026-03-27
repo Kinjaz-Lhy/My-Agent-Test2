@@ -1,10 +1,11 @@
 package com.company.finance.service.advisor;
 
-import com.company.finance.service.advisor.DataMaskingService;
 import kd.ai.nova.chat.advisor.api.CallAdvisor;
 import kd.ai.nova.chat.advisor.api.CallAdvisorChain;
 import kd.ai.nova.chat.ChatClientRequest;
 import kd.ai.nova.chat.ChatClientResponse;
+import kd.ai.nova.core.data.message.AiMessage;
+import kd.ai.nova.core.model.chat.response.ChatResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,18 +74,25 @@ public class DataMaskingAdvisor implements CallAdvisor {
     @Override
     public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
         // 先调用下游 Advisor 链获取原始响应
-        ChatClientResponse response = chain.adviseCall(request);
+        ChatClientResponse response = chain.nextCall(request);
 
         // 对响应内容执行脱敏处理
         try {
-            String originalContent = response.getResult().getOutput().getContent();
+            String originalContent = response.chatResponse().aiMessage().text();
             if (originalContent != null && !originalContent.isEmpty()) {
                 String maskedContent = dataMaskingService.mask(originalContent);
                 if (!maskedContent.equals(originalContent)) {
                     log.debug("敏感信息脱敏处理完成，原始长度={}，脱敏后长度={}",
                             originalContent.length(), maskedContent.length());
+                    // AiMessage is immutable; rebuild response with masked content
+                    ChatResponse maskedChatResponse = ChatResponse.builder()
+                            .from(response.chatResponse())
+                            .aiMessage(AiMessage.from(maskedContent))
+                            .build();
+                    return response.mutate()
+                            .chatResponse(maskedChatResponse)
+                            .build();
                 }
-                response.getResult().getOutput().setContent(maskedContent);
             }
         } catch (Exception e) {
             // 脱敏失败不应阻断正常响应流程，仅记录警告日志

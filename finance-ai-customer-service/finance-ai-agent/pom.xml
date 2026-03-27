@@ -28,6 +28,12 @@
             <artifactId>finance-ai-common</artifactId>
         </dependency>
 
+        <!-- 依赖基础设施层（外部系统客户端接口） -->
+        <dependency>
+            <groupId>com.company.finance</groupId>
+            <artifactId>finance-ai-infrastructure</artifactId>
+        </dependency>
+
         <!-- AI-Nova 框架：Agent 能力 -->
         <dependency>
             <groupId>com.kingdee</groupId>
@@ -36,6 +42,26 @@
         <dependency>
             <groupId>com.kingdee</groupId>
             <artifactId>ai-nova-agent</artifactId>
+        </dependency>
+
+        <!-- Apache HttpClient（AI-Nova OpenAiChatModel 运行时依赖） -->
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+        </dependency>
+
+        <!-- Guava（AI-Nova 运行时依赖） -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>32.1.3-jre</version>
+        </dependency>
+
+        <!-- Micrometer Observation（AI-Nova 运行时依赖） -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-observation</artifactId>
+            <version>1.12.3</version>
         </dependency>
 
         <!-- Spring 上下文（用于依赖注入） -->

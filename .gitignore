@@ -7,3 +7,4 @@ docs/
 finance-ai-customer-service/finance-ai-api/target/
 **/target/
 *.jqwik-database
+finance-ai-customer-service/finance-ai-ui/

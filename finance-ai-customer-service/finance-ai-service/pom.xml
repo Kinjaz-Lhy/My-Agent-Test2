@@ -46,6 +46,12 @@
             <artifactId>ai-nova-core</artifactId>
         </dependency>
 
+        <!-- AI-Nova Agent（SupervisorAgent） -->
+        <dependency>
+            <groupId>com.kingdee</groupId>
+            <artifactId>ai-nova-agent</artifactId>
+        </dependency>
+
         <!-- Spring WebFlux（响应式编程） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -62,6 +68,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

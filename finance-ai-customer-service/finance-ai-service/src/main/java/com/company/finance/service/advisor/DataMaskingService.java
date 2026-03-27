@@ -1,6 +1,7 @@
 package com.company.finance.service.advisor;
 
 import com.company.finance.common.constants.SensitivePatterns;
+import org.springframework.stereotype.Service;
 
 /**
  * 敏感信息脱敏服务
@@ -11,6 +12,7 @@ import com.company.finance.common.constants.SensitivePatterns;
  *
  * @see SensitivePatterns
  */
+@Service
 public class DataMaskingService {
 
     /**

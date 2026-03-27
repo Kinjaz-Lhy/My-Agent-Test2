@@ -31,4 +31,12 @@ public interface SatisfactionFeedbackMapper {
      * @return 平均评分，无数据时返回 null
      */
     Double selectAvgScoreByDateRange(@Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    /**
+     * 根据会话 ID 查询满意度反馈
+     *
+     * @param sessionId 会话 ID
+     * @return 满意度反馈实体，不存在时返回 null
+     */
+    SatisfactionFeedback selectBySessionId(@Param("sessionId") String sessionId);
 }
