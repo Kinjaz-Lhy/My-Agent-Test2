@@ -2,6 +2,7 @@ package com.company.finance.agent.tool;
 
 import com.company.finance.infrastructure.client.FSSPlatformClient;
 import kd.ai.nova.core.tool.annotation.Tool;
+import kd.ai.nova.core.tool.annotation.ToolParam;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -24,7 +25,9 @@ public class ExpenseQueryTool {
     }
 
     @Tool(description = "根据报销单号和员工ID查询报销单状态，返回报销单当前审批状态、金额、提交时间等信息")
-    public String queryExpenseStatus(String expenseId, String employeeId) {
+    public String queryExpenseStatus(
+            @ToolParam(description = "报销单号") String expenseId,
+            @ToolParam(description = "员工ID") String employeeId) {
         try {
             log.info("查询报销单状态: expenseId={}, employeeId={}", expenseId, employeeId);
             Map<String, Object> result = fssPlatformClient.queryExpenseStatus(expenseId, employeeId);

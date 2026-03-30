@@ -2,6 +2,7 @@ package com.company.finance.agent.tool;
 
 import com.company.finance.infrastructure.client.FSSPlatformClient;
 import kd.ai.nova.core.tool.annotation.Tool;
+import kd.ai.nova.core.tool.annotation.ToolParam;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +26,11 @@ public class BillingSubmitTool {
     }
 
     @Tool(description = "提交开票申请到财务共享平台，需要提供购买方名称、开票金额、发票类型、开票内容等信息，返回提交结果")
-    public String submitBilling(String buyerName, double amount, String invoiceType, String content) {
+    public String submitBilling(
+            @ToolParam(description = "购买方名称") String buyerName,
+            @ToolParam(description = "开票金额") double amount,
+            @ToolParam(description = "发票类型，如增值税专用发票、增值税普通发票") String invoiceType,
+            @ToolParam(description = "开票内容") String content) {
         try {
             log.info("提交开票申请: buyerName={}, amount={}, invoiceType={}", buyerName, amount, invoiceType);
             Map<String, Object> billingData = new HashMap<>();

@@ -2,6 +2,7 @@ package com.company.finance.agent.tool;
 
 import com.company.finance.infrastructure.client.ERPClient;
 import kd.ai.nova.core.tool.annotation.Tool;
+import kd.ai.nova.core.tool.annotation.ToolParam;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +26,7 @@ public class SupplierQueryTool {
     }
 
     @Tool(description = "根据供应商ID查询供应商基本信息，返回供应商名称、联系方式、资质状态等")
-    public String querySupplierById(String supplierId) {
+    public String querySupplierById(@ToolParam(description = "供应商ID") String supplierId) {
         try {
             log.info("查询供应商信息: supplierId={}", supplierId);
             Map<String, Object> result = erpClient.querySupplierInfo(supplierId);
@@ -37,7 +38,7 @@ public class SupplierQueryTool {
     }
 
     @Tool(description = "根据供应商名称模糊搜索供应商列表，返回匹配的供应商信息")
-    public String searchSupplierByName(String supplierName) {
+    public String searchSupplierByName(@ToolParam(description = "供应商名称，支持模糊搜索") String supplierName) {
         try {
             log.info("搜索供应商: supplierName={}", supplierName);
             Map<String, Object> result = erpClient.searchSupplierByName(supplierName);

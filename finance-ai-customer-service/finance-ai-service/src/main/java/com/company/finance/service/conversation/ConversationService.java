@@ -1,5 +1,11 @@
 package com.company.finance.service.conversation;
 
+import com.company.finance.agent.AgentConfig;
+import com.company.finance.agent.tool.ExpenseQueryTool;
+import com.company.finance.agent.tool.ExpenseSubmitTool;
+import com.company.finance.agent.tool.InvoiceVerifyTool;
+import com.company.finance.agent.tool.SalaryQueryTool;
+import com.company.finance.agent.tool.SupplierQueryTool;
 import com.company.finance.common.dto.ChatStreamResponse;
 import com.company.finance.common.enums.MessageRole;
 import com.company.finance.common.enums.SessionStatus;
@@ -18,13 +24,16 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import kd.ai.nova.graph.OverAllState;
+import kd.ai.nova.graph.agent.ReactAgent;
 import kd.ai.nova.graph.agent.flow.agent.SupervisorAgent;
 import kd.ai.nova.chat.ChatClient;
 import kd.ai.nova.chat.ModelOptions;
 import kd.ai.nova.chat.advisor.MessageChatMemoryAdvisor;
+import kd.ai.nova.chat.advisor.ToolCallAdvisor;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 
@@ -66,7 +75,9 @@ public class ConversationService {
     /** 系统提示词 */
     private static final String SYSTEM_PROMPT =
             "你是企业财务共享中心的智能客服助手，负责帮助员工处理财务咨询和业务办理。\n"
-            + "请用专业、友好的中文回答问题。如果无法确定用户意图，请主动询问以明确需求。";
+            + "请用专业、友好的中文回答问题。如果无法确定用户意图，请主动询问以明确需求。\n"
+            + "如果遇到无法处理的问题，建议用户联系财务共享中心人工客服（电话：400-888-8888）。\n"
+            + "不要编造不存在的电话号码或联系方式，只使用上述提供的信息。";
 
     private final SessionMapper sessionMapper;
     private final ChatMessageMapper chatMessageMapper;
@@ -74,7 +85,21 @@ public class ConversationService {
     private final DataMaskingService dataMaskingService;
     private final SatisfactionFeedbackService satisfactionFeedbackService;
     private final SupervisorAgent supervisorAgent;
+    private final ReactAgent expenseAgent;
+    private final ReactAgent invoiceAgent;
+    private final ReactAgent salaryAgent;
+    private final ReactAgent supplierAgent;
+    private final ReactAgent guideAgent;
     private final ChatClient chatClient;
+    /** 不带记忆 Advisor 的 ChatClient，用于闲聊回退（通过 messages() 手动传入历史） */
+    private final ChatClient plainChatClient;
+    /** 带工具调用能力的 ChatClient，用于业务意图的工具调用 */
+    private final ChatClient toolChatClient;
+    private final ExpenseQueryTool expenseQueryTool;
+    private final ExpenseSubmitTool expenseSubmitTool;
+    private final InvoiceVerifyTool invoiceVerifyTool;
+    private final SalaryQueryTool salaryQueryTool;
+    private final SupplierQueryTool supplierQueryTool;
     private final ObjectMapper objectMapper;
 
     public ConversationService(SessionMapper sessionMapper,
@@ -83,6 +108,16 @@ public class ConversationService {
                                DataMaskingService dataMaskingService,
                                SatisfactionFeedbackService satisfactionFeedbackService,
                                SupervisorAgent supervisorAgent,
+                               @Qualifier("expenseAgent") ReactAgent expenseAgent,
+                               @Qualifier("invoiceAgent") ReactAgent invoiceAgent,
+                               @Qualifier("salaryAgent") ReactAgent salaryAgent,
+                               @Qualifier("supplierAgent") ReactAgent supplierAgent,
+                               @Qualifier("guideAgent") ReactAgent guideAgent,
+                               ExpenseQueryTool expenseQueryTool,
+                               ExpenseSubmitTool expenseSubmitTool,
+                               InvoiceVerifyTool invoiceVerifyTool,
+                               SalaryQueryTool salaryQueryTool,
+                               SupplierQueryTool supplierQueryTool,
                                ModelOptions modelOptions,
                                DataSource dataSource) {
         this.sessionMapper = sessionMapper;
@@ -91,6 +126,16 @@ public class ConversationService {
         this.dataMaskingService = dataMaskingService;
         this.satisfactionFeedbackService = satisfactionFeedbackService;
         this.supervisorAgent = supervisorAgent;
+        this.expenseAgent = expenseAgent;
+        this.invoiceAgent = invoiceAgent;
+        this.salaryAgent = salaryAgent;
+        this.supplierAgent = supplierAgent;
+        this.guideAgent = guideAgent;
+        this.expenseQueryTool = expenseQueryTool;
+        this.expenseSubmitTool = expenseSubmitTool;
+        this.invoiceVerifyTool = invoiceVerifyTool;
+        this.salaryQueryTool = salaryQueryTool;
+        this.supplierQueryTool = supplierQueryTool;
         this.objectMapper = new ObjectMapper();
 
         // 构建 Advisor 链：记忆 → 脱敏 → 人工转接
@@ -109,6 +154,16 @@ public class ConversationService {
         this.chatClient = ChatClient.builder(modelOptions)
                 .defaultAdvisors(memoryAdvisor, maskingAdvisor, handoffAdvisor)
                 .defaultSystem(SYSTEM_PROMPT)
+                .build();
+
+        // 不带记忆的 ChatClient，用于闲聊回退（历史通过 messages() 手动传入）
+        this.plainChatClient = ChatClient.builder(modelOptions)
+                .defaultSystem(SYSTEM_PROMPT)
+                .build();
+
+        // 带工具调用能力的 ChatClient，用于业务意图的工具调用
+        this.toolChatClient = ChatClient.builder(modelOptions)
+                .defaultAdvisors(new ToolCallAdvisor(10))
                 .build();
     }
 
@@ -284,45 +339,41 @@ public class ConversationService {
         // 2. 持久化用户消息
         persistMessage(activeSessionId, MessageRole.USER, message, null);
 
-        // 3. 先用 ChatClient 判断意图，闲聊直接回复，业务问题走 SupervisorAgent
+        // 3. 判断意图：业务问题走 SupervisorAgent，其他走 ChatClient
         return Mono.fromCallable(new Callable<String>() {
                     @Override
                     public String call() throws Exception {
-                        // 先尝试 SupervisorAgent 调度
-                        try {
-                            Optional<OverAllState> result = supervisorAgent.invoke(message);
-                            if (result.isPresent()) {
-                                Map<String, Object> data = result.get().data();
-                                if (data != null) {
-                                    // 从 agent_output 提取
-                                    Object agentOutput = data.get("agent_output");
-                                    if (agentOutput != null && !agentOutput.toString().isEmpty()) {
-                                        return agentOutput.toString();
-                                    }
-                                    // 从 messages 中找 AiMessage
-                                    Object msgs = data.get("messages");
-                                    if (msgs instanceof java.util.List) {
-                                        java.util.List<?> msgList = (java.util.List<?>) msgs;
-                                        for (int i = msgList.size() - 1; i >= 0; i--) {
-                                            Object msg = msgList.get(i);
-                                            if (msg != null && msg.getClass().getSimpleName().contains("AiMessage")) {
-                                                Object text = msg.getClass().getMethod("text").invoke(msg);
-                                                if (text != null && !text.toString().isEmpty()) {
-                                                    return text.toString();
-                                                }
-                                            }
-                                        }
+                        // 判断是否为业务意图
+                        if (isBusinessIntent(message)) {
+                            // 使用 ChatClient + ToolCallAdvisor 直接调用工具
+                            // 根据意图选择对应的 system prompt
+                            String agentInstruction = routeToInstruction(message);
+                            log.info("业务意图路由: message='{}', instruction='{}'",
+                                    message, agentInstruction.substring(0, Math.min(50, agentInstruction.length())));
+                            try {
+                                kd.ai.nova.core.model.chat.response.ChatResponse toolResponse = toolChatClient.request()
+                                        .system(agentInstruction)
+                                        .user(message)
+                                        .tools(expenseQueryTool, expenseSubmitTool, invoiceVerifyTool, salaryQueryTool, supplierQueryTool)
+                                        .call();
+                                if (toolResponse != null && toolResponse.aiMessage() != null) {
+                                    String text = toolResponse.aiMessage().text();
+                                    if (text != null && !text.isEmpty()) {
+                                        return text;
                                     }
                                 }
+                            } catch (Exception e) {
+                                log.warn("工具调用异常，回退到 ChatClient", e);
                             }
-                        } catch (Exception e) {
-                            log.warn("SupervisorAgent 调用异常，回退到 ChatClient", e);
                         }
 
-                        // SupervisorAgent 没有返回有效回复，用 ChatClient 直接对话
-                        log.info("SupervisorAgent 未返回有效回复，使用 ChatClient 直接对话");
-                        kd.ai.nova.core.model.chat.response.ChatResponse chatResponse = chatClient.request()
+                        // 非业务意图或 SupervisorAgent 无有效回复，用 ChatClient 直接对话
+                        log.info("非业务意图或回退: message='{}', sessionId={}, 走 plainChatClient", message, activeSessionId);
+                        java.util.List<kd.ai.nova.core.data.message.ChatMessage> historyMessages = buildHistoryMessages(activeSessionId);
+                        log.info("历史消息数量: sessionId={}, count={}", activeSessionId, historyMessages.size());
+                        kd.ai.nova.core.model.chat.response.ChatResponse chatResponse = plainChatClient.request()
                                 .system(SYSTEM_PROMPT)
+                                .messages(historyMessages)
                                 .user(message)
                                 .call();
                         if (chatResponse != null && chatResponse.aiMessage() != null) {
@@ -367,6 +418,178 @@ public class ConversationService {
     }
 
     // ==================== 私有辅助方法 ====================
+
+    /**
+     * 从对象中提取文本内容（支持 AiMessage.text() 和普通 String）
+     */
+    private String extractText(Object obj) {
+        if (obj == null) return null;
+        // 先尝试反射调用 text() 方法
+        try {
+            java.lang.reflect.Method textMethod = obj.getClass().getMethod("text");
+            Object text = textMethod.invoke(obj);
+            if (text != null && !text.toString().isEmpty()) {
+                return text.toString();
+            }
+        } catch (Exception e) {
+            // 没有 text() 方法，继续处理
+        }
+        // 回退到 toString，清理 AiMessage 包装格式
+        String str = obj.toString();
+        if (str.contains("AiMessage")) {
+            // 清理 "AiMessage { text = \"...\" , toolExecutionRequests = null }" 格式
+            str = str.replaceAll("^\\s*AiMessage\\s*\\{\\s*text\\s*=\\s*\"", "");
+            str = str.replaceAll("\"\\s*,?\\s*toolExecutionRequests\\s*=\\s*null\\s*\\}\\s*$", "");
+            str = str.replaceAll("\"\\s*\\}\\s*$", "");
+        }
+        return str;
+    }
+
+    /**
+     * 判断用户消息是否包含业务意图关键词
+     */
+    private boolean isBusinessIntent(String message) {
+        if (message == null || message.trim().length() < 2) {
+            return false;
+        }
+        String[] businessKeywords = {
+            "报销", "借款", "付款", "发票", "验真", "开票",
+            "工资", "薪资", "个税", "社保", "公积金",
+            "供应商", "审批", "退回", "材料", "表单",
+            "单据", "差旅", "补贴", "预算", "费用",
+            "查询", "提交", "申请", "核对", "验证"
+        };
+        for (String keyword : businessKeywords) {
+            if (message.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 根据用户消息关键词路由到对应的子 Agent。
+     * 直接调用子 Agent 可以确保用户原始消息完整传递，避免 SupervisorAgent 改写消息。
+     *
+     * @return 匹配的子 Agent，无法确定时返回 null（走 SupervisorAgent 兜底）
+     */
+    private ReactAgent routeToAgent(String message) {
+        if (message.contains("报销") || message.contains("借款") || message.contains("付款")
+                || message.contains("差旅") || message.contains("费用") || message.contains("补贴")) {
+            return expenseAgent;
+        }
+        if (message.contains("发票") || message.contains("验真") || message.contains("开票")) {
+            return invoiceAgent;
+        }
+        if (message.contains("工资") || message.contains("薪资") || message.contains("个税")
+                || message.contains("社保") || message.contains("公积金")) {
+            return salaryAgent;
+        }
+        if (message.contains("供应商")) {
+            return supplierAgent;
+        }
+        if (message.contains("退回") || message.contains("材料") || message.contains("表单")
+                || message.contains("单据")) {
+            return guideAgent;
+        }
+        return null;
+    }
+
+    /**
+     * 根据用户消息关键词返回对应的业务 system prompt。
+     * 配合 toolChatClient 使用，让 LLM 在正确的角色下调用工具。
+     */
+    private String routeToInstruction(String message) {
+        if (message.contains("报销") || message.contains("借款") || message.contains("付款")
+                || message.contains("差旅") || message.contains("费用") || message.contains("补贴")) {
+            return AgentConfig.EXPENSE_INSTRUCTION;
+        }
+        if (message.contains("发票") || message.contains("验真") || message.contains("开票")) {
+            return AgentConfig.INVOICE_INSTRUCTION;
+        }
+        if (message.contains("工资") || message.contains("薪资") || message.contains("个税")
+                || message.contains("社保") || message.contains("公积金")) {
+            return AgentConfig.SALARY_INSTRUCTION;
+        }
+        if (message.contains("供应商")) {
+            return AgentConfig.SUPPLIER_INSTRUCTION;
+        }
+        if (message.contains("退回") || message.contains("材料") || message.contains("表单")
+                || message.contains("单据")) {
+            return AgentConfig.GUIDE_INSTRUCTION;
+        }
+        return SYSTEM_PROMPT;
+    }
+
+    /**
+     * 从数据库加载会话历史消息，转换为 AI-Nova ChatMessage 列表
+     */
+    /**
+     * 构建带上下文的消息，将最近几轮对话历史摘要拼接到当前消息前。
+     * 仅保留最近 MAX_CONTEXT_ROUNDS 轮（一问一答为一轮），避免上下文过长。
+     * 如果当前消息本身包含完整参数（如报销单号+员工ID），则不需要历史上下文。
+     */
+    private static final int MAX_CONTEXT_ROUNDS = 3;
+
+    private String buildContextualMessage(String sessionId, String currentMessage) {
+        try {
+            List<ChatMessage> dbMessages = chatMessageMapper.selectBySessionId(sessionId);
+            if (dbMessages == null || dbMessages.size() <= 1) {
+                // 只有当前这条消息（刚 persist 的），无历史
+                return currentMessage;
+            }
+
+            // 排除最后一条（就是当前刚持久化的用户消息），取之前的历史
+            List<ChatMessage> history = dbMessages.subList(0, dbMessages.size() - 1);
+
+            // 只取最近 MAX_CONTEXT_ROUNDS 轮
+            int maxMessages = MAX_CONTEXT_ROUNDS * 2;
+            int startIdx = Math.max(0, history.size() - maxMessages);
+            List<ChatMessage> recentHistory = history.subList(startIdx, history.size());
+
+            if (recentHistory.isEmpty()) {
+                return currentMessage;
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("【以下是本次会话的最近对话记录，供你理解上下文】\n");
+            for (ChatMessage msg : recentHistory) {
+                String role = msg.getRole() == MessageRole.USER ? "用户" : "助手";
+                // 截断过长的历史消息，避免上下文爆炸
+                String content = msg.getContent();
+                if (content != null && content.length() > 200) {
+                    content = content.substring(0, 200) + "...";
+                }
+                sb.append(role).append(": ").append(content).append("\n");
+            }
+            sb.append("【对话记录结束】\n\n");
+            sb.append("当前用户请求: ").append(currentMessage);
+
+            return sb.toString();
+        } catch (Exception e) {
+            log.warn("构建上下文消息失败，回退到原始消息: sessionId={}", sessionId, e);
+            return currentMessage;
+        }
+    }
+
+    private java.util.List<kd.ai.nova.core.data.message.ChatMessage> buildHistoryMessages(String sessionId) {
+        java.util.List<kd.ai.nova.core.data.message.ChatMessage> result = new ArrayList<>();
+        try {
+            List<ChatMessage> dbMessages = chatMessageMapper.selectBySessionId(sessionId);
+            if (dbMessages != null) {
+                for (ChatMessage msg : dbMessages) {
+                    if (msg.getRole() == MessageRole.USER) {
+                        result.add(new kd.ai.nova.core.data.message.UserMessage(msg.getContent()));
+                    } else if (msg.getRole() == MessageRole.ASSISTANT) {
+                        result.add(kd.ai.nova.core.data.message.AiMessage.from(msg.getContent()));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("加载会话历史消息失败: sessionId={}", sessionId, e);
+        }
+        return result;
+    }
 
     /**
      * 持久化对话消息到数据库

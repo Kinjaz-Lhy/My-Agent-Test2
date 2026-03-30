@@ -2,6 +2,7 @@ package com.company.finance.agent.tool;
 
 import com.company.finance.infrastructure.client.FSSPlatformClient;
 import kd.ai.nova.core.tool.annotation.Tool;
+import kd.ai.nova.core.tool.annotation.ToolParam;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +26,11 @@ public class ExpenseSubmitTool {
     }
 
     @Tool(description = "提交报销单到财务共享平台，需要提供报销类型、金额、事由、员工ID等信息，返回提交结果")
-    public String submitExpense(String employeeId, String expenseType, double amount, String reason) {
+    public String submitExpense(
+            @ToolParam(description = "员工ID") String employeeId,
+            @ToolParam(description = "报销类型，如差旅报销、办公用品、招待费等") String expenseType,
+            @ToolParam(description = "报销金额") double amount,
+            @ToolParam(description = "报销事由") String reason) {
         try {
             log.info("提交报销单: employeeId={}, type={}, amount={}, reason={}", employeeId, expenseType, amount, reason);
             Map<String, Object> expenseData = new HashMap<>();

@@ -7,7 +7,6 @@ import com.company.finance.agent.tool.SalaryQueryTool;
 import com.company.finance.agent.tool.SupplierQueryTool;
 
 import kd.ai.nova.graph.agent.ReactAgent;
-import kd.ai.nova.graph.checkpoint.savers.MemorySaver;
 import kd.ai.nova.core.model.chat.ChatModel;
 import kd.ai.nova.core.tool.ToolCallbacks;
 
@@ -34,11 +33,11 @@ public class AgentConfig {
                                    ExpenseSubmitTool expenseSubmitTool) {
         return ReactAgent.builder()
                 .name("expense-agent")
+                .description("处理报销单查询、报销单发起、借款单和付款申请查询等报销相关业务")
                 .model(chatModel)
                 .tools(ToolCallbacks.from(expenseQueryTool, expenseSubmitTool))
                 .instruction(EXPENSE_INSTRUCTION)
                 .outputKey("agent_output")
-                .saver(new MemorySaver())
                 .build();
     }
 
@@ -49,11 +48,11 @@ public class AgentConfig {
                                    InvoiceVerifyTool invoiceVerifyTool) {
         return ReactAgent.builder()
                 .name("invoice-agent")
+                .description("处理发票验真、发票查询和发票相关咨询")
                 .model(chatModel)
                 .tools(ToolCallbacks.from(invoiceVerifyTool))
                 .instruction(INVOICE_INSTRUCTION)
                 .outputKey("agent_output")
-                .saver(new MemorySaver())
                 .build();
     }
 
@@ -64,10 +63,11 @@ public class AgentConfig {
                                   SalaryQueryTool salaryQueryTool) {
         return ReactAgent.builder()
                 .name("salary-agent")
+                .description("处理工资条查询、个税查询、社保公积金查询等薪资相关业务")
                 .model(chatModel)
                 .tools(ToolCallbacks.from(salaryQueryTool))
                 .instruction(SALARY_INSTRUCTION)
-                .saver(new MemorySaver())
+                .outputKey("agent_output")
                 .build();
     }
 
@@ -78,10 +78,11 @@ public class AgentConfig {
                                     SupplierQueryTool supplierQueryTool) {
         return ReactAgent.builder()
                 .name("supplier-agent")
+                .description("处理供应商信息核对、供应商搜索等供应商相关业务")
                 .model(chatModel)
                 .tools(ToolCallbacks.from(supplierQueryTool))
                 .instruction(SUPPLIER_INSTRUCTION)
-                .saver(new MemorySaver())
+                .outputKey("agent_output")
                 .build();
     }
 
@@ -91,27 +92,35 @@ public class AgentConfig {
     public ReactAgent guideAgent(ChatModel chatModel) {
         return ReactAgent.builder()
                 .name("guide-agent")
+                .description("处理单据退回分析、材料补齐引导、表单验证指导和重新提交引导")
                 .model(chatModel)
                 .instruction(GUIDE_INSTRUCTION)
-                .saver(new MemorySaver())
+                .outputKey("agent_output")
                 .build();
     }
 
     // ==================== 智能体指令常量 ====================
 
-    static final String EXPENSE_INSTRUCTION =
+    public static final String EXPENSE_INSTRUCTION =
             "你是报销业务专家智能体，负责处理企业员工的报销相关需求。\n\n"
+            + "【核心行为准则 - 必须遵守】\n"
+            + "- 当用户消息中已包含报销单号和/或员工ID时，必须立即调用对应的工具执行查询，不要先自我介绍或列举能力\n"
+            + "- 不要复述你的职责和能力列表，直接执行用户请求\n"
+            + "- 只有当用户意图不明确或缺少必要参数时，才主动询问补充信息\n\n"
             + "你的职责包括：\n"
             + "1. 查询报销单状态：根据报销单号或员工ID查询报销单的审批进度、金额、当前步骤等信息\n"
             + "2. 发起报销单：引导员工逐步填写报销类型、金额、事由等信息，并提交至财务共享平台\n"
             + "3. 查询借款单和付款申请状态\n\n"
             + "操作规范：\n"
-            + "- 查询前务必确认报销单号或员工ID等必要信息\n"
+            + "- 查询前务必确认报销单号或员工ID等必要信息，如果用户已提供则直接调用工具\n"
             + "- 提交报销单前需确认所有必填字段已填写完整\n"
             + "- 如果外部系统调用失败，向员工返回明确的错误提示并建议替代操作方式\n"
+            + "- 严格使用工具返回的数据回答问题，不要编造任何数据（金额、日期、审批人等）\n"
+            + "- 如果工具返回的数据中没有某个字段，不要自行补充，直接告知用户该信息暂不可用\n"
+            + "- 禁止生成工具未返回的数据，包括但不限于金额、时间、人名、流程步骤\n"
             + "- 回答应简洁专业，使用中文";
 
-    static final String INVOICE_INSTRUCTION =
+    public static final String INVOICE_INSTRUCTION =
             "你是发票业务专家智能体，负责处理企业员工的发票相关需求。\n\n"
             + "你的职责包括：\n"
             + "1. 发票验真：调用税务验真接口验证发票真伪，需要员工提供发票代码和发票号码\n"
@@ -121,9 +130,10 @@ public class AgentConfig {
             + "- 验真前务必确认发票代码和发票号码已提供\n"
             + "- 对于验证结果为\"存疑\"的发票，建议员工联系财务部门进一步核实\n"
             + "- 如果税务接口调用失败，向员工返回明确的错误提示\n"
+            + "- 严格使用工具返回的数据回答问题，不要编造任何数据\n"
             + "- 回答应简洁专业，使用中文";
 
-    static final String SALARY_INSTRUCTION =
+    public static final String SALARY_INSTRUCTION =
             "你是薪资查询专家智能体，负责处理企业员工的薪资、个税、社保公积金查询需求。\n\n"
             + "你的职责包括：\n"
             + "1. 查询工资条：根据员工ID和年月查询基本工资、奖金、津贴、实发工资等\n"
@@ -138,9 +148,10 @@ public class AgentConfig {
             + "- 查询前务必确认员工ID和年月信息\n"
             + "- 返回的薪资数据中敏感金额会由系统自动脱敏处理\n"
             + "- 如果HR系统调用失败，向员工返回明确的错误提示\n"
+            + "- 严格使用工具返回的数据回答问题，不要编造任何数据\n"
             + "- 回答应简洁专业，使用中文";
 
-    static final String SUPPLIER_INSTRUCTION =
+    public static final String SUPPLIER_INSTRUCTION =
             "你是供应商查询专家智能体，负责处理企业员工的供应商信息核对需求。\n\n"
             + "你的职责包括：\n"
             + "1. 按供应商ID查询：根据供应商ID从ERP系统获取供应商详细信息\n"
@@ -150,9 +161,10 @@ public class AgentConfig {
             + "- 查询前务必确认供应商ID或名称信息\n"
             + "- 如果搜索结果较多，建议员工提供更精确的搜索条件\n"
             + "- 如果ERP系统调用失败，向员工返回明确的错误提示\n"
+            + "- 严格使用工具返回的数据回答问题，不要编造任何数据\n"
             + "- 回答应简洁专业，使用中文";
 
-    static final String GUIDE_INSTRUCTION =
+    public static final String GUIDE_INSTRUCTION =
             "你是流程引导专家智能体，负责帮助员工处理单据退回、材料补齐和表单规范性问题。\n\n"
             + "你的职责包括：\n"
             + "1. 退回原因分析：当员工的单据被退回时，分析退回原因并生成具体的修改建议\n"

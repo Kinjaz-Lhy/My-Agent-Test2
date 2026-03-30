@@ -2,6 +2,7 @@ package com.company.finance.agent.tool;
 
 import com.company.finance.infrastructure.client.HRClient;
 import kd.ai.nova.core.tool.annotation.Tool;
+import kd.ai.nova.core.tool.annotation.ToolParam;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -24,7 +25,9 @@ public class SalaryQueryTool {
     }
 
     @Tool(description = "查询员工薪资信息，需要提供员工ID和年月（格式yyyy-MM），返回基本工资、奖金、津贴、实发工资等")
-    public String querySalary(String employeeId, String yearMonth) {
+    public String querySalary(
+            @ToolParam(description = "员工ID") String employeeId,
+            @ToolParam(description = "年月，格式为yyyy-MM，如2026-03") String yearMonth) {
         try {
             log.info("查询薪资信息: employeeId={}, yearMonth={}", employeeId, yearMonth);
             Map<String, Object> result = hrClient.querySalary(employeeId, yearMonth);
@@ -36,7 +39,9 @@ public class SalaryQueryTool {
     }
 
     @Tool(description = "查询员工个税信息，需要提供员工ID和年月（格式yyyy-MM），返回应纳税所得额、税率、个税金额等")
-    public String queryTax(String employeeId, String yearMonth) {
+    public String queryTax(
+            @ToolParam(description = "员工ID") String employeeId,
+            @ToolParam(description = "年月，格式为yyyy-MM，如2026-03") String yearMonth) {
         try {
             log.info("查询个税信息: employeeId={}, yearMonth={}", employeeId, yearMonth);
             Map<String, Object> result = hrClient.queryTax(employeeId, yearMonth);
@@ -48,7 +53,9 @@ public class SalaryQueryTool {
     }
 
     @Tool(description = "查询员工社保公积金信息，需要提供员工ID和年月（格式yyyy-MM），返回养老保险、医疗保险、住房公积金等明细")
-    public String querySocialInsurance(String employeeId, String yearMonth) {
+    public String querySocialInsurance(
+            @ToolParam(description = "员工ID") String employeeId,
+            @ToolParam(description = "年月，格式为yyyy-MM，如2026-03") String yearMonth) {
         try {
             log.info("查询社保公积金信息: employeeId={}, yearMonth={}", employeeId, yearMonth);
             Map<String, Object> result = hrClient.querySocialInsurance(employeeId, yearMonth);

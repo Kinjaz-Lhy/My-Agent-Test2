@@ -2,6 +2,7 @@ package com.company.finance.agent.tool;
 
 import com.company.finance.infrastructure.client.FSSPlatformClient;
 import kd.ai.nova.core.tool.annotation.Tool;
+import kd.ai.nova.core.tool.annotation.ToolParam;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -24,7 +25,9 @@ public class LoanQueryTool {
     }
 
     @Tool(description = "根据借款单号和员工ID查询借款单或付款申请状态，返回单据当前状态、金额、用途等信息")
-    public String queryLoanStatus(String loanId, String employeeId) {
+    public String queryLoanStatus(
+            @ToolParam(description = "借款单号") String loanId,
+            @ToolParam(description = "员工ID") String employeeId) {
         try {
             log.info("查询借款单状态: loanId={}, employeeId={}", loanId, employeeId);
             Map<String, Object> result = fssPlatformClient.queryLoanStatus(loanId, employeeId);

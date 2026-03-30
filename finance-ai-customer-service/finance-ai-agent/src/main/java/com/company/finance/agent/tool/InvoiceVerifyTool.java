@@ -2,6 +2,7 @@ package com.company.finance.agent.tool;
 
 import com.company.finance.infrastructure.client.TaxClient;
 import kd.ai.nova.core.tool.annotation.Tool;
+import kd.ai.nova.core.tool.annotation.ToolParam;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -24,7 +25,9 @@ public class InvoiceVerifyTool {
     }
 
     @Tool(description = "调用税务接口验证发票真伪，需要提供发票代码和发票号码，返回验真结果")
-    public String verifyInvoice(String invoiceCode, String invoiceNumber) {
+    public String verifyInvoice(
+            @ToolParam(description = "发票代码") String invoiceCode,
+            @ToolParam(description = "发票号码") String invoiceNumber) {
         try {
             log.info("发票验真: invoiceCode={}, invoiceNumber={}", invoiceCode, invoiceNumber);
             Map<String, Object> result = taxClient.verifyInvoice(invoiceCode, invoiceNumber);
