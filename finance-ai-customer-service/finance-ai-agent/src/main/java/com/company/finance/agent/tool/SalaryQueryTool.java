@@ -70,12 +70,12 @@ public class SalaryQueryTool {
         StringBuilder sb = new StringBuilder();
         sb.append("薪资查询结果：\n");
         sb.append("- 年月: ").append(result.getOrDefault("yearMonth", "未知")).append("\n");
-        sb.append("- 基本工资: ").append(result.getOrDefault("baseSalary", "未知")).append("\n");
-        sb.append("- 奖金: ").append(result.getOrDefault("bonus", "未知")).append("\n");
-        sb.append("- 津贴: ").append(result.getOrDefault("allowance", "未知")).append("\n");
-        sb.append("- 应发合计: ").append(result.getOrDefault("totalSalary", "未知")).append("\n");
-        sb.append("- 扣除合计: ").append(result.getOrDefault("deductions", "未知")).append("\n");
-        sb.append("- 实发工资: ").append(result.getOrDefault("netSalary", "未知"));
+        sb.append("- 基本工资: ").append(result.getOrDefault("baseSalary", "未知")).append("元\n");
+        sb.append("- 奖金: ").append(result.getOrDefault("bonus", "未知")).append("元\n");
+        sb.append("- 津贴: ").append(result.getOrDefault("allowance", "未知")).append("元\n");
+        sb.append("- 应发合计: ").append(result.getOrDefault("totalSalary", "未知")).append("元\n");
+        sb.append("- 扣除合计: ").append(result.getOrDefault("deductions", "未知")).append("元\n");
+        sb.append("- 实发工资: ").append(result.getOrDefault("netSalary", "未知")).append("元");
         return sb.toString();
     }
 
@@ -83,11 +83,11 @@ public class SalaryQueryTool {
         StringBuilder sb = new StringBuilder();
         sb.append("个税查询结果：\n");
         sb.append("- 年月: ").append(result.getOrDefault("yearMonth", "未知")).append("\n");
-        sb.append("- 应纳税所得额: ").append(result.getOrDefault("taxableIncome", "未知")).append("\n");
+        sb.append("- 应纳税所得额: ").append(result.getOrDefault("taxableIncome", "未知")).append("元\n");
         sb.append("- 税率: ").append(result.getOrDefault("taxRate", "未知")).append("\n");
-        sb.append("- 速算扣除数: ").append(result.getOrDefault("quickDeduction", "未知")).append("\n");
-        sb.append("- 当月个税: ").append(result.getOrDefault("taxAmount", "未知")).append("\n");
-        sb.append("- 累计个税: ").append(result.getOrDefault("cumulativeTax", "未知"));
+        sb.append("- 速算扣除数: ").append(result.getOrDefault("quickDeduction", "未知")).append("元\n");
+        sb.append("- 当月个税: ").append(result.getOrDefault("taxAmount", "未知")).append("元\n");
+        sb.append("- 累计个税: ").append(result.getOrDefault("cumulativeTax", "未知")).append("元");
         return sb.toString();
     }
 
@@ -95,11 +95,11 @@ public class SalaryQueryTool {
         StringBuilder sb = new StringBuilder();
         sb.append("社保公积金查询结果：\n");
         sb.append("- 年月: ").append(result.getOrDefault("yearMonth", "未知")).append("\n");
-        sb.append("- 养老保险: ").append(result.getOrDefault("pensionInsurance", "未知")).append("\n");
-        sb.append("- 医疗保险: ").append(result.getOrDefault("medicalInsurance", "未知")).append("\n");
-        sb.append("- 失业保险: ").append(result.getOrDefault("unemploymentInsurance", "未知")).append("\n");
-        sb.append("- 住房公积金: ").append(result.getOrDefault("housingFund", "未知")).append("\n");
-        sb.append("- 扣除合计: ").append(result.getOrDefault("totalDeduction", "未知"));
+        sb.append("- 养老保险: ").append(result.getOrDefault("pensionInsurance", "未知")).append("元\n");
+        sb.append("- 医疗保险: ").append(result.getOrDefault("medicalInsurance", "未知")).append("元\n");
+        sb.append("- 失业保险: ").append(result.getOrDefault("unemploymentInsurance", "未知")).append("元\n");
+        sb.append("- 住房公积金: ").append(result.getOrDefault("housingFund", "未知")).append("元\n");
+        sb.append("- 扣除合计: ").append(result.getOrDefault("totalDeduction", "未知")).append("元");
         return sb.toString();
     }
 }

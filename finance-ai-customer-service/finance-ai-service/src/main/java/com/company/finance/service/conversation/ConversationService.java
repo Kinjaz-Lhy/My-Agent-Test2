@@ -29,7 +29,6 @@ import kd.ai.nova.graph.agent.flow.agent.SupervisorAgent;
 import kd.ai.nova.chat.ChatClient;
 import kd.ai.nova.chat.ModelOptions;
 import kd.ai.nova.chat.advisor.MessageChatMemoryAdvisor;
-import kd.ai.nova.chat.advisor.ToolCallAdvisor;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,7 +76,11 @@ public class ConversationService {
             "你是企业财务共享中心的智能客服助手，负责帮助员工处理财务咨询和业务办理。\n"
             + "请用专业、友好的中文回答问题。如果无法确定用户意图，请主动询问以明确需求。\n"
             + "如果遇到无法处理的问题，建议用户联系财务共享中心人工客服（电话：400-888-8888）。\n"
-            + "不要编造不存在的电话号码或联系方式，只使用上述提供的信息。";
+            + "不要编造不存在的电话号码或联系方式，只使用上述提供的信息。\n"
+            + "【严禁编造数据】当用户询问具体的薪资金额、报销状态、发票信息等业务数据时，"
+            + "你必须通过工具查询获取真实数据后再回答。"
+            + "如果没有工具可用或工具调用失败，请告知用户：系统正在处理中，请稍后重试。"
+            + "绝对禁止凭空编造任何金额、日期、姓名、部门等业务数据。";
 
     private final SessionMapper sessionMapper;
     private final ChatMessageMapper chatMessageMapper;
@@ -93,8 +96,6 @@ public class ConversationService {
     private final ChatClient chatClient;
     /** 不带记忆 Advisor 的 ChatClient，用于闲聊回退（通过 messages() 手动传入历史） */
     private final ChatClient plainChatClient;
-    /** 带工具调用能力的 ChatClient，用于业务意图的工具调用 */
-    private final ChatClient toolChatClient;
     private final ExpenseQueryTool expenseQueryTool;
     private final ExpenseSubmitTool expenseSubmitTool;
     private final InvoiceVerifyTool invoiceVerifyTool;
@@ -159,11 +160,6 @@ public class ConversationService {
         // 不带记忆的 ChatClient，用于闲聊回退（历史通过 messages() 手动传入）
         this.plainChatClient = ChatClient.builder(modelOptions)
                 .defaultSystem(SYSTEM_PROMPT)
-                .build();
-
-        // 带工具调用能力的 ChatClient，用于业务意图的工具调用
-        this.toolChatClient = ChatClient.builder(modelOptions)
-                .defaultAdvisors(new ToolCallAdvisor(10))
                 .build();
     }
 
@@ -339,32 +335,31 @@ public class ConversationService {
         // 2. 持久化用户消息
         persistMessage(activeSessionId, MessageRole.USER, message, null);
 
-        // 3. 判断意图：业务问题走 SupervisorAgent，其他走 ChatClient
+        // 3. 判断意图：业务问题走 ReactAgent，其他走 ChatClient
         return Mono.fromCallable(new Callable<String>() {
                     @Override
                     public String call() throws Exception {
-                        // 判断是否为业务意图
-                        if (isBusinessIntent(message)) {
-                            // 使用 ChatClient + ToolCallAdvisor 直接调用工具
-                            // 根据意图选择对应的 system prompt
-                            String agentInstruction = routeToInstruction(message);
-                            log.info("业务意图路由: message='{}', instruction='{}'",
-                                    message, agentInstruction.substring(0, Math.min(50, agentInstruction.length())));
+                        // 判断是否为业务意图（结合当前消息和会话历史）
+                        ReactAgent targetAgent = resolveAgentFromContext(message, activeSessionId);
+                        if (targetAgent != null) {
+                            log.info("业务意图路由到 ReactAgent: message='{}', agent='{}'",
+                                    message, targetAgent.name());
                             try {
-                                kd.ai.nova.core.model.chat.response.ChatResponse toolResponse = toolChatClient.request()
-                                        .system(agentInstruction)
-                                        .user(message)
-                                        .tools(expenseQueryTool, expenseSubmitTool, invoiceVerifyTool, salaryQueryTool, supplierQueryTool)
-                                        .call();
-                                if (toolResponse != null && toolResponse.aiMessage() != null) {
-                                    String text = toolResponse.aiMessage().text();
+                                // 构建带上下文的消息，让 Agent 理解多轮对话
+                                String contextualMessage = buildContextualMessage(activeSessionId, message);
+                                kd.ai.nova.core.data.message.AiMessage aiMessage = targetAgent.call(contextualMessage);
+                                if (aiMessage != null) {
+                                    String text = aiMessage.text();
                                     if (text != null && !text.isEmpty()) {
                                         return text;
                                     }
                                 }
+                                log.warn("ReactAgent 返回空响应: agent='{}'", targetAgent.name());
                             } catch (Exception e) {
-                                log.warn("工具调用异常，回退到 ChatClient", e);
+                                log.error("ReactAgent 调用异常: agent='{}'", targetAgent.name(), e);
                             }
+                            // 业务意图但工具调用失败，返回明确错误提示，禁止回退到无工具的 ChatClient
+                            return "抱歉，系统暂时无法查询到相关数据，请稍后重试或联系人工客服（电话：400-888-8888）。";
                         }
 
                         // 非业务意图或 SupervisorAgent 无有效回复，用 ChatClient 直接对话
@@ -494,6 +489,49 @@ public class ConversationService {
         }
         return null;
     }
+
+    /**
+     * 结合当前消息和会话历史上下文，解析应路由到的 ReactAgent。
+     * <p>
+     * 先尝试从当前消息匹配业务关键词；若未匹配，则回溯会话历史消息，
+     * 判断用户是否正在进行多轮业务对话（如先说"薪资查询"，再提供参数"100000 2026-03"）。
+     * </p>
+     */
+    private ReactAgent resolveAgentFromContext(String message, String sessionId) {
+        // 1. 先尝试从当前消息直接匹配
+        if (isBusinessIntent(message)) {
+            ReactAgent agent = routeToAgent(message);
+            if (agent != null) {
+                return agent;
+            }
+        }
+
+        // 2. 当前消息未匹配，回溯会话历史寻找业务上下文
+        try {
+            List<ChatMessage> history = chatMessageMapper.selectBySessionId(sessionId);
+            if (history != null && !history.isEmpty()) {
+                // 从最近的消息往前找，最多回溯 6 条（3 轮对话）
+                int startIdx = Math.max(0, history.size() - 6);
+                for (int i = history.size() - 1; i >= startIdx; i--) {
+                    ChatMessage msg = history.get(i);
+                    if (msg.getContent() != null) {
+                        ReactAgent agent = routeToAgent(msg.getContent());
+                        if (agent != null) {
+                            log.info("从会话历史匹配到业务上下文: sessionId={}, historyMsg='{}', agent='{}'",
+                                    sessionId, msg.getContent().substring(0, Math.min(30, msg.getContent().length())),
+                                    agent.name());
+                            return agent;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("回溯会话历史失败: sessionId={}", sessionId, e);
+        }
+
+        return null;
+    }
+
 
     /**
      * 根据用户消息关键词返回对应的业务 system prompt。
