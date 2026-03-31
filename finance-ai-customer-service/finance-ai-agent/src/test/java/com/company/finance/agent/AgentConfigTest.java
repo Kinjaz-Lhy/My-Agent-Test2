@@ -15,6 +15,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AgentConfigTest {
 
     @Test
+    void expenseInstruction_containsKnowledgeGroundingRule() {
+        assertThat(AgentConfig.EXPENSE_INSTRUCTION)
+                .contains("知识库引用准则")
+                .contains("read_skill(\"expense-policy\")")
+                .contains("禁止编造");
+    }
+
+    @Test
     void expenseInstruction_containsKeyResponsibilities() {
         assertThat(AgentConfig.EXPENSE_INSTRUCTION)
                 .contains("报销")
@@ -24,12 +32,28 @@ class AgentConfigTest {
     }
 
     @Test
+    void invoiceInstruction_containsKnowledgeGroundingRule() {
+        assertThat(AgentConfig.INVOICE_INSTRUCTION)
+                .contains("知识库引用准则")
+                .contains("read_skill(\"invoice-guide\")")
+                .contains("禁止编造");
+    }
+
+    @Test
     void invoiceInstruction_containsKeyResponsibilities() {
         assertThat(AgentConfig.INVOICE_INSTRUCTION)
                 .contains("发票")
                 .contains("发票验真")
                 .contains("发票代码")
                 .contains("发票号码");
+    }
+
+    @Test
+    void salaryInstruction_containsKnowledgeGroundingRule() {
+        assertThat(AgentConfig.SALARY_INSTRUCTION)
+                .contains("知识库引用准则")
+                .contains("read_skill(\"tax-policy\")")
+                .contains("禁止编造");
     }
 
     @Test
@@ -49,6 +73,14 @@ class AgentConfigTest {
                 .contains("ERP")
                 .contains("供应商ID")
                 .contains("模糊搜索");
+    }
+
+    @Test
+    void guideInstruction_containsKnowledgeGroundingRule() {
+        assertThat(AgentConfig.GUIDE_INSTRUCTION)
+                .contains("知识库引用准则")
+                .contains("read_skill(\"approval-flow\")")
+                .contains("禁止编造");
     }
 
     @Test

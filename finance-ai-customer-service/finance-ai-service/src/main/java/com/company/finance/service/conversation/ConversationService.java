@@ -29,6 +29,8 @@ import kd.ai.nova.graph.agent.flow.agent.SupervisorAgent;
 import kd.ai.nova.chat.ChatClient;
 import kd.ai.nova.chat.ModelOptions;
 import kd.ai.nova.chat.advisor.MessageChatMemoryAdvisor;
+import kd.ai.nova.chat.advisor.SkillAdvisor;
+import kd.ai.nova.core.tool.ToolCallbacks;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,6 +121,7 @@ public class ConversationService {
                                InvoiceVerifyTool invoiceVerifyTool,
                                SalaryQueryTool salaryQueryTool,
                                SupplierQueryTool supplierQueryTool,
+                               SkillAdvisor skillAdvisor,
                                ModelOptions modelOptions,
                                DataSource dataSource) {
         this.sessionMapper = sessionMapper;
@@ -153,7 +156,10 @@ public class ConversationService {
         );
 
         this.chatClient = ChatClient.builder(modelOptions)
-                .defaultAdvisors(memoryAdvisor, maskingAdvisor, handoffAdvisor)
+                .defaultAdvisors(memoryAdvisor, maskingAdvisor, handoffAdvisor, skillAdvisor)
+                .defaultTools(ToolCallbacks.from(
+                        expenseQueryTool, expenseSubmitTool,
+                        invoiceVerifyTool, salaryQueryTool, supplierQueryTool))
                 .defaultSystem(SYSTEM_PROMPT)
                 .build();
 
@@ -396,35 +402,35 @@ public class ConversationService {
         // 2. 持久化用户消息
         persistMessage(activeSessionId, MessageRole.USER, message, null);
 
-        // 3. 判断意图：业务问题走 ReactAgent，其他走 ChatClient
+        // 3. 判断意图：业务问题走带技能+工具的 chatClient，其他走 plainChatClient
         return Mono.fromCallable(new Callable<String>() {
                     @Override
                     public String call() throws Exception {
                         // 判断是否为业务意图（结合当前消息和会话历史）
-                        ReactAgent targetAgent = resolveAgentFromContext(message, activeSessionId);
-                        if (targetAgent != null) {
-                            log.info("业务意图路由到 ReactAgent: message='{}', agent='{}'",
-                                    message, targetAgent.name());
+                        if (isBusinessIntent(message) || resolveAgentFromContext(message, activeSessionId) != null) {
+                            String instruction = routeToInstruction(message);
+                            log.info("业务意图走 chatClient（技能+工具）: message='{}'", message);
                             try {
-                                // 构建带上下文的消息，让 Agent 理解多轮对话
                                 String contextualMessage = buildContextualMessage(activeSessionId, message);
-                                kd.ai.nova.core.data.message.AiMessage aiMessage = targetAgent.call(contextualMessage);
-                                if (aiMessage != null) {
-                                    String text = aiMessage.text();
+                                kd.ai.nova.core.model.chat.response.ChatResponse chatResponse = chatClient.request()
+                                        .system(instruction)
+                                        .user(contextualMessage)
+                                        .call();
+                                if (chatResponse != null && chatResponse.aiMessage() != null) {
+                                    String text = chatResponse.aiMessage().text();
                                     if (text != null && !text.isEmpty()) {
                                         return text;
                                     }
                                 }
-                                log.warn("ReactAgent 返回空响应: agent='{}'", targetAgent.name());
+                                log.warn("chatClient 业务调用返回空响应");
                             } catch (Exception e) {
-                                log.error("ReactAgent 调用异常: agent='{}'", targetAgent.name(), e);
+                                log.error("chatClient 业务调用异常", e);
                             }
-                            // 业务意图但工具调用失败，返回明确错误提示，禁止回退到无工具的 ChatClient
                             return "抱歉，系统暂时无法查询到相关数据，请稍后重试或联系人工客服（电话：400-888-8888）。";
                         }
 
-                        // 非业务意图或 SupervisorAgent 无有效回复，用 ChatClient 直接对话
-                        log.info("非业务意图或回退: message='{}', sessionId={}, 走 plainChatClient", message, activeSessionId);
+                        // 非业务意图，用 plainChatClient 直接对话
+                        log.info("非业务意图: message='{}', sessionId={}, 走 plainChatClient", message, activeSessionId);
                         java.util.List<kd.ai.nova.core.data.message.ChatMessage> historyMessages = buildHistoryMessages(activeSessionId);
                         log.info("历史消息数量: sessionId={}, count={}", activeSessionId, historyMessages.size());
                         kd.ai.nova.core.model.chat.response.ChatResponse chatResponse = plainChatClient.request()
@@ -530,8 +536,68 @@ public class ConversationService {
      * @return 匹配的子 Agent，无法确定时返回 null（走 SupervisorAgent 兜底）
      */
     private ReactAgent routeToAgent(String message) {
+        return classifyIntentByLLM(message);
+    }
+
+    /**
+     * 使用 LLM 进行意图分类，返回对应的 ReactAgent。
+     * <p>
+     * 让模型只返回一个 agent 名称（或 NONE），避免硬编码关键词遗漏和误匹配。
+     * </p>
+     */
+    private static final String INTENT_CLASSIFY_PROMPT =
+            "你是一个意图分类器。根据用户消息，判断应该由哪个智能体处理，只返回智能体名称，不要返回其他内容。\n\n"
+            + "可选智能体：\n"
+            + "expense-agent：报销、借款、付款、差旅、出差、住宿标准、餐饮补贴、交通费、费用报销制度\n"
+            + "invoice-agent：发票验真、发票查询、发票类型、开票、增值税发票\n"
+            + "salary-agent：工资、薪资、个税、社保、公积金、税率、专项扣除\n"
+            + "supplier-agent：供应商查询、供应商核对\n"
+            + "guide-agent：单据退回、材料补齐、表单填写、审批流程、审批步骤\n"
+            + "NONE：闲聊、打招呼、无法判断\n\n"
+            + "只返回上述名称之一，不要解释。";
+
+    private ReactAgent classifyIntentByLLM(String message) {
+        try {
+            kd.ai.nova.core.model.chat.response.ChatResponse response = plainChatClient.request()
+                    .system(INTENT_CLASSIFY_PROMPT)
+                    .user(message)
+                    .call();
+
+            if (response == null || response.aiMessage() == null) {
+                log.warn("意图分类 LLM 返回空响应");
+                return null;
+            }
+
+            String agentName = response.aiMessage().text().trim().toLowerCase();
+            log.info("LLM 意图分类结果: message='{}', agent='{}'", message, agentName);
+
+            switch (agentName) {
+                case "expense-agent":
+                    return expenseAgent;
+                case "invoice-agent":
+                    return invoiceAgent;
+                case "salary-agent":
+                    return salaryAgent;
+                case "supplier-agent":
+                    return supplierAgent;
+                case "guide-agent":
+                    return guideAgent;
+                default:
+                    return null;
+            }
+        } catch (Exception e) {
+            log.error("LLM 意图分类异常，回退到关键词匹配", e);
+            return fallbackRouteByKeyword(message);
+        }
+    }
+
+    /**
+     * 关键词匹配兜底，仅在 LLM 分类失败时使用。
+     */
+    private ReactAgent fallbackRouteByKeyword(String message) {
         if (message.contains("报销") || message.contains("借款") || message.contains("付款")
-                || message.contains("差旅") || message.contains("费用") || message.contains("补贴")) {
+                || message.contains("差旅") || message.contains("费用") || message.contains("补贴")
+                || message.contains("出差") || message.contains("住宿")) {
             return expenseAgent;
         }
         if (message.contains("发票") || message.contains("验真") || message.contains("开票")) {
@@ -550,6 +616,7 @@ public class ConversationService {
         }
         return null;
     }
+
 
     /**
      * 结合当前消息和会话历史上下文，解析应路由到的 ReactAgent。

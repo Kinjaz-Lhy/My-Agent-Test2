@@ -44,6 +44,7 @@ public class ChatMemoryConfig {
 
         RelationalDBMemoryStore store = RelationalDBMemoryStore.builder()
                 .dataSource(dataSource)
+                .autoInitializeTable(true)
                 .build();
 
         return ConversationChatMemory.builder()

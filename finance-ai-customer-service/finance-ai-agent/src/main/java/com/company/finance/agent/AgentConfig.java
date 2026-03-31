@@ -6,24 +6,74 @@ import com.company.finance.agent.tool.InvoiceVerifyTool;
 import com.company.finance.agent.tool.SalaryQueryTool;
 import com.company.finance.agent.tool.SupplierQueryTool;
 
+import kd.ai.nova.chat.advisor.SkillAdvisor;
+import kd.ai.nova.core.skills.registry.classpath.ClasspathSkillRegistry;
+import kd.ai.nova.core.tool.ToolCallback;
+import kd.ai.nova.core.tool.ToolCallbacks;
 import kd.ai.nova.graph.agent.ReactAgent;
 import kd.ai.nova.core.model.chat.ChatModel;
-import kd.ai.nova.core.tool.ToolCallbacks;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 业务 ReactAgent 配置。
  * <p>
- * 使用 AI-Nova ReactAgent.builder() 模式创建各业务智能体，
- * 每个智能体配置对应的 @Tool 工具和领域指令。
+ * 使用 AI-Nova ReactAgent.builder() 模式创建各业务智能体。
+ * 技能知识通过 ClasspathSkillRegistry + SkillAdvisor 渐进式加载，
+ * 模型按需调用 read_skill() 获取完整知识内容，减少初始上下文大小。
  * </p>
- *
- * @see <a href="需求 3.1-3.7, 4.1-4.4">业务办理智能体能力 &amp; 流程引导</a>
  */
 @Configuration
 public class AgentConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(AgentConfig.class);
+
+    // ==================== 技能注册中心 ====================
+
+    @Bean
+    public ClasspathSkillRegistry skillRegistry() {
+        ClasspathSkillRegistry registry = ClasspathSkillRegistry.builder()
+                .classpathPath("skills")
+                .build();
+        log.info("已从 classpath:skills/ 加载技能注册中心");
+        return registry;
+    }
+
+    // ==================== 技能绑定工具映射 ====================
+
+    @Bean
+    public SkillAdvisor skillAdvisor(ClasspathSkillRegistry skillRegistry,
+                                     ExpenseQueryTool expenseQueryTool,
+                                     ExpenseSubmitTool expenseSubmitTool,
+                                     InvoiceVerifyTool invoiceVerifyTool,
+                                     SalaryQueryTool salaryQueryTool,
+                                     SupplierQueryTool supplierQueryTool) {
+        // 技能名称 → 绑定的工具列表
+        Map<String, List<ToolCallback>> groupedTools = new HashMap<>();
+        groupedTools.put("expense-policy",
+                Arrays.<ToolCallback>asList(ToolCallbacks.from(expenseQueryTool, expenseSubmitTool)));
+        groupedTools.put("invoice-guide",
+                Arrays.<ToolCallback>asList(ToolCallbacks.from(invoiceVerifyTool)));
+        groupedTools.put("tax-policy",
+                Arrays.<ToolCallback>asList(ToolCallbacks.from(salaryQueryTool)));
+        groupedTools.put("approval-flow",
+                Arrays.<ToolCallback>asList(ToolCallbacks.from(supplierQueryTool)));
+
+        log.info("已配置技能绑定工具: {}", groupedTools.keySet());
+
+        return SkillAdvisor.builder()
+                .skillRegistry(skillRegistry)
+                .groupedTools(groupedTools)
+                .build();
+    }
 
     // ==================== 报销智能体 ====================
 
@@ -107,6 +157,12 @@ public class AgentConfig {
             + "- 当用户消息中已包含报销单号和/或员工ID时，必须立即调用对应的工具执行查询，不要先自我介绍或列举能力\n"
             + "- 不要复述你的职责和能力列表，直接执行用户请求\n"
             + "- 只有当用户意图不明确或缺少必要参数时，才主动询问补充信息\n\n"
+            + "【知识库引用准则 - 最高优先级】\n"
+            + "- 当用户询问报销标准、差旅标准、餐饮补贴、交通费规则、报销时效等制度性问题时，"
+            + "必须先调用 read_skill(\"expense-policy\") 加载报销制度知识，再严格依据知识内容回答\n"
+            + "- 禁止编造任何知识库中不存在的标准、金额或规则\n"
+            + "- 如果知识库中没有覆盖用户所问的具体场景，明确告知：该场景暂无明确规定，建议联系财务部门确认\n"
+            + "- 回答时应注明数据来源于公司报销制度\n\n"
             + "你的职责包括：\n"
             + "1. 查询报销单状态：根据报销单号或员工ID查询报销单的审批进度、金额、当前步骤等信息\n"
             + "2. 发起报销单：引导员工逐步填写报销类型、金额、事由等信息，并提交至财务共享平台\n"
@@ -123,6 +179,11 @@ public class AgentConfig {
 
     public static final String INVOICE_INSTRUCTION =
             "你是发票业务专家智能体，负责处理企业员工的发票相关需求。\n\n"
+            + "【知识库引用准则 - 最高优先级】\n"
+            + "- 当用户询问发票类型、验真方法、报销注意事项等制度性问题时，"
+            + "必须先调用 read_skill(\"invoice-guide\") 加载发票知识，再严格依据知识内容回答\n"
+            + "- 禁止编造知识库中不存在的规则或流程\n"
+            + "- 如果知识库未覆盖用户所问场景，明确告知：该场景暂无明确规定，建议联系财务部门确认\n\n"
             + "你的职责包括：\n"
             + "1. 发票验真：调用税务验真接口验证发票真伪，需要员工提供发票代码和发票号码\n"
             + "2. 解读验真结果：向员工清晰说明发票的验证状态、类型、金额、税额等信息\n"
@@ -141,6 +202,11 @@ public class AgentConfig {
             + "- 当用户提供了员工ID和年月时，必须立即调用对应的工具执行查询，不要二次确认身份\n"
             + "- 不要复述你的职责和能力列表，直接执行用户请求\n"
             + "- 严格使用工具返回的数据回答问题，禁止编造任何数据\n\n"
+            + "【知识库引用准则 - 最高优先级】\n"
+            + "- 当用户询问个税税率、专项附加扣除、年终奖计税等税务政策问题时，"
+            + "必须先调用 read_skill(\"tax-policy\") 加载税务政策知识，再严格依据知识内容回答\n"
+            + "- 禁止编造知识库中不存在的税率、扣除标准或政策规则\n"
+            + "- 如果知识库未覆盖用户所问场景，明确告知：该场景暂无明确规定，建议咨询税务部门\n\n"
             + "【数据真实性 - 最高优先级】\n"
             + "- 所有数值必须来源于工具返回的真实数据，禁止凭空编造\n"
             + "- 允许基于工具返回的真实数据进行合理的分析和推导（如计算构成比例、解释扣除项等）\n"
@@ -177,6 +243,11 @@ public class AgentConfig {
 
     public static final String GUIDE_INSTRUCTION =
             "你是流程引导专家智能体，负责帮助员工处理单据退回、材料补齐和表单规范性问题。\n\n"
+            + "【知识库引用准则 - 最高优先级】\n"
+            + "- 当用户询问审批步骤、所需材料、预计时间等流程性问题时，"
+            + "必须先调用 read_skill(\"approval-flow\") 加载审批流程知识，再严格依据知识内容回答\n"
+            + "- 禁止编造知识库中不存在的审批步骤、材料要求或时间节点\n"
+            + "- 如果知识库未覆盖用户所问场景，明确告知：该场景暂无明确规定，建议联系财务部门确认\n\n"
             + "你的职责包括：\n"
             + "1. 退回原因分析：当员工的单据被退回时，分析退回原因并生成具体的修改建议\n"
             + "2. 材料补齐引导：当提交材料不完整时，列出缺失的材料清单并引导员工逐项补齐\n"
