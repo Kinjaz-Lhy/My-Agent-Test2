@@ -33,4 +33,12 @@ public interface ChatMessageMapper {
      * @return 消息列表
      */
     List<ChatMessage> selectBySessionId(@Param("sessionId") String sessionId);
+
+    /**
+     * 根据会话 ID 删除所有消息
+     *
+     * @param sessionId 会话 ID
+     * @return 影响行数
+     */
+    int deleteBySessionId(@Param("sessionId") String sessionId);
 }

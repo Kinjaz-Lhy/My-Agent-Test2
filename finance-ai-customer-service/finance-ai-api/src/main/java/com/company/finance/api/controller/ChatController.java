@@ -4,6 +4,8 @@ import com.company.finance.api.security.UserPrincipal;
 import com.company.finance.common.dto.ChatRequest;
 import com.company.finance.common.dto.ChatStreamResponse;
 import com.company.finance.common.dto.FeedbackRequest;
+import com.company.finance.common.dto.SessionPinRequest;
+import com.company.finance.common.dto.SessionRenameRequest;
 import com.company.finance.domain.entity.SatisfactionFeedback;
 import com.company.finance.domain.entity.Session;
 import com.company.finance.service.conversation.ConversationService;
@@ -169,5 +171,48 @@ public class ChatController {
                 request.getComment()
         );
         return Mono.just(ResponseEntity.ok(feedback));
+    }
+
+    // ==================== 会话管理端点 ====================
+
+    /**
+     * 重命名会话
+     */
+    @PostMapping("/sessions/{sessionId}/rename")
+    public Mono<ResponseEntity<Void>> renameSession(
+            @PathVariable String sessionId,
+            @Valid @RequestBody SessionRenameRequest request) {
+        boolean success = conversationService.renameSession(sessionId, request.getTitle());
+        if (!success) {
+            return Mono.just(ResponseEntity.notFound().build());
+        }
+        return Mono.just(ResponseEntity.ok().build());
+    }
+
+    /**
+     * 置顶/取消置顶会话
+     */
+    @PostMapping("/sessions/{sessionId}/pin")
+    public Mono<ResponseEntity<Void>> pinSession(
+            @PathVariable String sessionId,
+            @Valid @RequestBody SessionPinRequest request) {
+        boolean success = conversationService.pinSession(sessionId, request.getPinned());
+        if (!success) {
+            return Mono.just(ResponseEntity.notFound().build());
+        }
+        return Mono.just(ResponseEntity.ok().build());
+    }
+
+    /**
+     * 删除会话
+     */
+    @PostMapping("/sessions/{sessionId}/delete")
+    public Mono<ResponseEntity<Void>> deleteSession(
+            @PathVariable String sessionId) {
+        boolean success = conversationService.deleteSession(sessionId);
+        if (!success) {
+            return Mono.just(ResponseEntity.notFound().build());
+        }
+        return Mono.just(ResponseEntity.ok().build());
     }
 }

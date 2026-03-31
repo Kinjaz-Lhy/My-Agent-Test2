@@ -50,4 +50,32 @@ public interface SessionMapper {
      * @return 影响行数
      */
     int updateStatus(@Param("sessionId") String sessionId, @Param("status") String status);
+
+    /**
+     * 更新会话标题
+     *
+     * @param sessionId 会话 ID
+     * @param title 新标题
+     * @return 影响行数
+     */
+    int updateTitle(@Param("sessionId") String sessionId, @Param("title") String title);
+
+    /**
+     * 更新会话置顶状态
+     *
+     * @param sessionId 会话 ID
+     * @param pinned 是否置顶
+     * @param pinnedAt 置顶时间（取消置顶时为 null）
+     * @return 影响行数
+     */
+    int updatePinned(@Param("sessionId") String sessionId, @Param("pinned") boolean pinned,
+                     @Param("pinnedAt") java.time.LocalDateTime pinnedAt);
+
+    /**
+     * 删除会话
+     *
+     * @param sessionId 会话 ID
+     * @return 影响行数
+     */
+    int deleteById(@Param("sessionId") String sessionId);
 }

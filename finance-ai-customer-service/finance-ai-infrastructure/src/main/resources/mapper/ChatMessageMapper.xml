@@ -31,4 +31,10 @@
         ORDER BY timestamp ASC
     </select>
 
+    <!-- 根据会话 ID 删除所有消息 -->
+    <delete id="deleteBySessionId">
+        DELETE FROM t_chat_message
+        WHERE session_id = #{sessionId}
+    </delete>
+
 </mapper>

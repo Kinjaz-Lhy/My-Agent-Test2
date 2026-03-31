@@ -40,6 +40,17 @@ public class Session {
     /** 会话状态：ACTIVE / TRANSFERRED / CLOSED */
     private SessionStatus status;
 
+    /** 会话标题（用户自定义） */
+    private String title;
+
+    /** 是否置顶 */
+    @Builder.Default
+    private Boolean pinned = false;
+
+    /** 置顶时间 */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime pinnedAt;
+
     /** 消息列表 */
     @Builder.Default
     private List<ChatMessage> messages = new ArrayList<>();

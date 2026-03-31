@@ -266,10 +266,62 @@ public class ConversationService {
      * 获取员工的会话列表
      *
      * @param employeeId 员工 ID
-     * @return 会话列表（按创建时间降序）
+     * @return 会话列表（置顶优先，再按创建时间降序）
      */
     public List<Session> getSessionsByEmployee(String employeeId) {
         return sessionMapper.selectByEmployeeId(employeeId);
+    }
+
+    /**
+     * 重命名会话
+     *
+     * @param sessionId 会话 ID
+     * @param title 新标题
+     * @return 是否成功
+     */
+    public boolean renameSession(String sessionId, String title) {
+        Session session = sessionMapper.selectById(sessionId);
+        if (session == null) {
+            return false;
+        }
+        sessionMapper.updateTitle(sessionId, title);
+        log.info("重命名会话: sessionId={}, title={}", sessionId, title);
+        return true;
+    }
+
+    /**
+     * 置顶/取消置顶会话
+     *
+     * @param sessionId 会话 ID
+     * @param pinned 是否置顶
+     * @return 是否成功
+     */
+    public boolean pinSession(String sessionId, boolean pinned) {
+        Session session = sessionMapper.selectById(sessionId);
+        if (session == null) {
+            return false;
+        }
+        LocalDateTime pinnedAt = pinned ? LocalDateTime.now() : null;
+        sessionMapper.updatePinned(sessionId, pinned, pinnedAt);
+        log.info("{}会话: sessionId={}", pinned ? "置顶" : "取消置顶", sessionId);
+        return true;
+    }
+
+    /**
+     * 删除会话及其关联的消息
+     *
+     * @param sessionId 会话 ID
+     * @return 是否成功
+     */
+    public boolean deleteSession(String sessionId) {
+        Session session = sessionMapper.selectById(sessionId);
+        if (session == null) {
+            return false;
+        }
+        chatMessageMapper.deleteBySessionId(sessionId);
+        sessionMapper.deleteById(sessionId);
+        log.info("删除会话: sessionId={}", sessionId);
+        return true;
     }
 
     /**
