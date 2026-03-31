@@ -27,6 +27,18 @@
         ORDER BY updated_at DESC
     </select>
 
+    <!-- 查询知识条目（按分类可选过滤，不限状态） -->
+    <select id="selectByCategory" resultMap="knowledgeEntryResultMap">
+        SELECT entry_id, category, title, content, status, created_by, reviewed_by, effective_at, created_at, updated_at
+        FROM t_knowledge_entry
+        <where>
+            <if test="category != null and category != ''">
+                AND category = #{category}
+            </if>
+        </where>
+        ORDER BY updated_at DESC
+    </select>
+
     <!-- 更新知识条目状态 -->
     <update id="updateStatus">
         UPDATE t_knowledge_entry
@@ -40,5 +52,22 @@
         VALUES (#{entryId}, #{category}, #{title}, #{content}, #{status},
                 #{createdBy}, #{reviewedBy}, #{effectiveAt}, #{createdAt}, #{updatedAt})
     </insert>
+
+    <!-- 删除知识条目 -->
+    <delete id="deleteById">
+        DELETE FROM t_knowledge_entry WHERE entry_id = #{entryId}
+    </delete>
+
+    <!-- 更新知识条目 -->
+    <update id="updateEntry">
+        UPDATE t_knowledge_entry
+        SET category = #{category}, title = #{title}, content = #{content}, updated_at = #{updatedAt}
+        WHERE entry_id = #{entryId}
+    </update>
+
+    <!-- 查询所有不重复的分类 -->
+    <select id="selectDistinctCategories" resultType="java.lang.String">
+        SELECT DISTINCT category FROM t_knowledge_entry ORDER BY category
+    </select>
 
 </mapper>

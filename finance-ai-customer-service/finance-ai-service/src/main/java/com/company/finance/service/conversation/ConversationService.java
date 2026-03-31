@@ -5,6 +5,7 @@ import com.company.finance.common.enums.ChatAction;
 import com.company.finance.agent.tool.ExpenseQueryTool;
 import com.company.finance.agent.tool.ExpenseSubmitTool;
 import com.company.finance.agent.tool.InvoiceVerifyTool;
+import com.company.finance.service.tool.KnowledgeQueryTool;
 import com.company.finance.agent.tool.SalaryQueryTool;
 import com.company.finance.agent.tool.SupplierQueryTool;
 import com.company.finance.common.dto.ChatStreamResponse;
@@ -31,6 +32,7 @@ import kd.ai.nova.chat.ChatClient;
 import kd.ai.nova.chat.ModelOptions;
 import kd.ai.nova.chat.advisor.MessageChatMemoryAdvisor;
 import kd.ai.nova.chat.advisor.SkillAdvisor;
+import kd.ai.nova.chat.advisor.ToolCallAdvisor;
 import kd.ai.nova.core.tool.ToolCallbacks;
 
 import org.slf4j.Logger;
@@ -80,6 +82,8 @@ public class ConversationService {
             + "请用专业、友好的中文回答问题。如果无法确定用户意图，请主动询问以明确需求。\n"
             + "如果遇到无法处理的问题，建议用户联系财务共享中心人工客服（电话：400-888-8888）。\n"
             + "不要编造不存在的电话号码或联系方式，只使用上述提供的信息。\n"
+            + "【知识库查询 - 重要】当用户询问企业内部系统、平台功能、业务流程等问题时，"
+            + "必须先调用 queryKnowledge 工具从企业知识库查询相关信息，再基于查询结果回答。\n"
             + "【严禁编造数据】当用户询问具体的薪资金额、报销状态、发票信息等业务数据时，"
             + "你必须通过工具查询获取真实数据后再回答。"
             + "如果没有工具可用或工具调用失败，请告知用户：系统正在处理中，请稍后重试。"
@@ -122,6 +126,7 @@ public class ConversationService {
                                InvoiceVerifyTool invoiceVerifyTool,
                                SalaryQueryTool salaryQueryTool,
                                SupplierQueryTool supplierQueryTool,
+                               KnowledgeQueryTool knowledgeQueryTool,
                                SkillAdvisor skillAdvisor,
                                ModelOptions modelOptions,
                                DataSource dataSource) {
@@ -160,12 +165,16 @@ public class ConversationService {
                 .defaultAdvisors(memoryAdvisor, maskingAdvisor, handoffAdvisor, skillAdvisor)
                 .defaultTools(ToolCallbacks.from(
                         expenseQueryTool, expenseSubmitTool,
-                        invoiceVerifyTool, salaryQueryTool, supplierQueryTool))
+                        invoiceVerifyTool, salaryQueryTool, supplierQueryTool,
+                        knowledgeQueryTool))
                 .defaultSystem(SYSTEM_PROMPT)
                 .build();
 
         // 不带记忆的 ChatClient，用于闲聊回退（历史通过 messages() 手动传入）
+        // 也挂载知识库查询工具，让非业务意图的问题也能查知识库
         this.plainChatClient = ChatClient.builder(modelOptions)
+                .defaultAdvisors(ToolCallAdvisor.builder().build())
+                .defaultTools(ToolCallbacks.from(knowledgeQueryTool))
                 .defaultSystem(SYSTEM_PROMPT)
                 .build();
     }

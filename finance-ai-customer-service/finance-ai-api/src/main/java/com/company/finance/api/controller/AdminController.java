@@ -3,11 +3,13 @@ package com.company.finance.api.controller;
 import com.company.finance.api.security.UserPrincipal;
 import com.company.finance.common.dto.AuditLogQuery;
 import com.company.finance.domain.entity.AuditLog;
+import com.company.finance.domain.entity.KnowledgeCategory;
 import com.company.finance.domain.entity.KnowledgeEntry;
 import com.company.finance.domain.entity.OperationMetrics;
 import com.company.finance.service.audit.AuditLogSearchService;
 import com.company.finance.service.autoreply.AutoReplyRule;
 import com.company.finance.service.autoreply.AutoReplyRuleService;
+import com.company.finance.service.knowledge.KnowledgeCategoryService;
 import com.company.finance.service.knowledge.KnowledgeService;
 import com.company.finance.service.operation.OperationService;
 import com.company.finance.service.operation.OperationService.HotTopic;
@@ -15,6 +17,7 @@ import com.company.finance.service.operation.OperationService.HotTopic;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -47,15 +50,18 @@ public class AdminController {
 
     private final AuditLogSearchService auditLogSearchService;
     private final OperationService operationService;
+    private final KnowledgeCategoryService knowledgeCategoryService;
     private final KnowledgeService knowledgeService;
     private final AutoReplyRuleService autoReplyRuleService;
 
     public AdminController(AuditLogSearchService auditLogSearchService,
                            OperationService operationService,
+                           KnowledgeCategoryService knowledgeCategoryService,
                            KnowledgeService knowledgeService,
                            AutoReplyRuleService autoReplyRuleService) {
         this.auditLogSearchService = auditLogSearchService;
         this.operationService = operationService;
+        this.knowledgeCategoryService = knowledgeCategoryService;
         this.knowledgeService = knowledgeService;
         this.autoReplyRuleService = autoReplyRuleService;
     }
@@ -142,6 +148,60 @@ public class AdminController {
     // ==================== 知识库管理 ====================
 
     /**
+     * 查询知识条目列表
+     * <p>
+     * 按分类查询知识条目，返回所有状态的条目（含待审核、已生效等）。
+     * 分类为空时返回全部条目。
+     * </p>
+     */
+    @GetMapping("/knowledge")
+    public Mono<ResponseEntity<List<KnowledgeEntry>>> listKnowledgeEntries(
+            @RequestParam(required = false) String category) {
+        List<KnowledgeEntry> entries = knowledgeService.findByCategory(category);
+        return Mono.just(ResponseEntity.ok(entries));
+    }
+
+    /**
+     * 查询知识分类列表
+     */
+    @GetMapping("/knowledge/categories")
+    public Mono<ResponseEntity<List<KnowledgeCategory>>> listKnowledgeCategories() {
+        List<KnowledgeCategory> categories = knowledgeCategoryService.findAll();
+        return Mono.just(ResponseEntity.ok(categories));
+    }
+
+    /**
+     * 新增知识分类
+     */
+    @PostMapping("/knowledge/categories")
+    public Mono<ResponseEntity<KnowledgeCategory>> addKnowledgeCategory(
+            @RequestBody KnowledgeCategory category) {
+        KnowledgeCategory created = knowledgeCategoryService.create(category);
+        return Mono.just(ResponseEntity.ok(created));
+    }
+
+    /**
+     * 更新知识分类
+     */
+    @PutMapping("/knowledge/categories/{categoryId}")
+    public Mono<ResponseEntity<Integer>> updateKnowledgeCategory(
+            @PathVariable String categoryId,
+            @RequestBody KnowledgeCategory category) {
+        category.setCategoryId(categoryId);
+        int rows = knowledgeCategoryService.update(category);
+        return rows > 0 ? Mono.just(ResponseEntity.ok(rows)) : Mono.just(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * 删除知识分类
+     */
+    @DeleteMapping("/knowledge/categories/{categoryId}")
+    public Mono<ResponseEntity<Integer>> deleteKnowledgeCategory(@PathVariable String categoryId) {
+        int rows = knowledgeCategoryService.delete(categoryId);
+        return rows > 0 ? Mono.just(ResponseEntity.ok(rows)) : Mono.just(ResponseEntity.notFound().build());
+    }
+
+    /**
      * 新增知识条目
      * <p>
      * 提交新的知识条目，状态自动置为 PENDING_REVIEW，待审核通过后生效。
@@ -184,6 +244,33 @@ public class AdminController {
         } else {
             rows = knowledgeService.rejectEntry(entryId, reviewerId);
         }
+        if (rows == 0) {
+            return Mono.just(ResponseEntity.notFound().build());
+        }
+        return Mono.just(ResponseEntity.ok(rows));
+    }
+
+    /**
+     * 更新知识条目
+     */
+    @PutMapping("/knowledge/{entryId}")
+    public Mono<ResponseEntity<Integer>> updateKnowledgeEntry(
+            @PathVariable String entryId,
+            @RequestBody KnowledgeEntry entry) {
+        entry.setEntryId(entryId);
+        int rows = knowledgeService.updateEntry(entry);
+        if (rows == 0) {
+            return Mono.just(ResponseEntity.notFound().build());
+        }
+        return Mono.just(ResponseEntity.ok(rows));
+    }
+
+    /**
+     * 删除知识条目
+     */
+    @DeleteMapping("/knowledge/{entryId}")
+    public Mono<ResponseEntity<Integer>> deleteKnowledgeEntry(@PathVariable String entryId) {
+        int rows = knowledgeService.deleteEntry(entryId);
         if (rows == 0) {
             return Mono.just(ResponseEntity.notFound().build());
         }

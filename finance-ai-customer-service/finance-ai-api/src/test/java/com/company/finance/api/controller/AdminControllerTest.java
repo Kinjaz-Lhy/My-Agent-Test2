@@ -9,6 +9,7 @@ import com.company.finance.domain.entity.OperationMetrics;
 import com.company.finance.service.audit.AuditLogSearchService;
 import com.company.finance.service.autoreply.AutoReplyRule;
 import com.company.finance.service.autoreply.AutoReplyRuleService;
+import com.company.finance.service.knowledge.KnowledgeCategoryService;
 import com.company.finance.service.knowledge.KnowledgeService;
 import com.company.finance.service.operation.OperationService;
 import com.company.finance.service.operation.OperationService.HotTopic;
@@ -40,6 +41,7 @@ class AdminControllerTest {
 
     private AuditLogSearchService auditLogSearchService;
     private OperationService operationService;
+    private KnowledgeCategoryService knowledgeCategoryService;
     private KnowledgeService knowledgeService;
     private AutoReplyRuleService autoReplyRuleService;
     private AdminController adminController;
@@ -49,10 +51,11 @@ class AdminControllerTest {
     void setUp() {
         auditLogSearchService = mock(AuditLogSearchService.class);
         operationService = mock(OperationService.class);
+        knowledgeCategoryService = mock(KnowledgeCategoryService.class);
         knowledgeService = mock(KnowledgeService.class);
         autoReplyRuleService = mock(AutoReplyRuleService.class);
         adminController = new AdminController(
-                auditLogSearchService, operationService, knowledgeService, autoReplyRuleService);
+                auditLogSearchService, operationService, knowledgeCategoryService, knowledgeService, autoReplyRuleService);
         operatorUser = new UserPrincipal("OP001", "DEPT-OPS", Collections.singletonList("ROLE_OPERATOR"));
     }
 

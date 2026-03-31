@@ -24,6 +24,14 @@ public interface KnowledgeEntryMapper {
     List<KnowledgeEntry> selectActiveByCategory(@Param("category") String category);
 
     /**
+     * 查询指定分类下所有知识条目（不限状态），分类为空时查全部
+     *
+     * @param category 分类名称（可选）
+     * @return 知识条目列表
+     */
+    List<KnowledgeEntry> selectByCategory(@Param("category") String category);
+
+    /**
      * 更新知识条目状态
      *
      * @param entryId 知识条目 ID
@@ -39,4 +47,19 @@ public interface KnowledgeEntryMapper {
      * @return 影响行数
      */
     int insert(KnowledgeEntry entry);
+
+    /**
+     * 删除知识条目
+     */
+    int deleteById(@Param("entryId") String entryId);
+
+    /**
+     * 更新知识条目内容
+     */
+    int updateEntry(KnowledgeEntry entry);
+
+    /**
+     * 查询所有不重复的分类
+     */
+    List<String> selectDistinctCategories();
 }

@@ -66,6 +66,24 @@ public class KnowledgeService {
     }
 
     /**
+     * 按分类查询所有知识条目（不限状态），用于管理页面展示。
+     * 分类为空时返回全部条目。
+     */
+    public List<KnowledgeEntry> findByCategory(String category) {
+        List<KnowledgeEntry> entries = knowledgeEntryMapper.selectByCategory(category);
+        log.debug("按分类[{}]检索到 {} 条知识条目（含所有状态）", category, entries.size());
+        return entries != null ? entries : Collections.emptyList();
+    }
+
+    /**
+     * 查询所有不重复的分类编码（从已有条目中动态获取）
+     */
+    public List<String> findAllCategories() {
+        List<String> categories = knowledgeEntryMapper.selectDistinctCategories();
+        return categories != null ? categories : Collections.emptyList();
+    }
+
+    /**
      * 报销标准按职级和城市匹配查询。
      * <p>
      * 从"报销制度"分类的有效条目中，筛选标题或内容同时包含指定职级和城市的条目。
@@ -170,7 +188,12 @@ public class KnowledgeService {
             log.warn("提交审核的知识条目为空");
             return 0;
         }
+        if (entry.getEntryId() == null || entry.getEntryId().isEmpty()) {
+            entry.setEntryId(java.util.UUID.randomUUID().toString());
+        }
         entry.setStatus(KnowledgeStatus.PENDING_REVIEW);
+        entry.setCreatedAt(java.time.LocalDateTime.now());
+        entry.setUpdatedAt(java.time.LocalDateTime.now());
         int rows = knowledgeEntryMapper.insert(entry);
         log.info("知识条目[{}]已提交审核，状态置为 PENDING_REVIEW", entry.getEntryId());
         return rows;
@@ -209,6 +232,31 @@ public class KnowledgeService {
         }
         int rows = knowledgeEntryMapper.updateStatus(entryId, KnowledgeStatus.DRAFT.name());
         log.info("知识条目[{}]审核驳回，审核人：{}，状态变为 DRAFT", entryId, reviewedBy);
+        return rows;
+    }
+
+    /**
+     * 删除知识条目
+     */
+    public int deleteEntry(String entryId) {
+        if (entryId == null || entryId.trim().isEmpty()) {
+            return 0;
+        }
+        int rows = knowledgeEntryMapper.deleteById(entryId);
+        log.info("知识条目[{}]已删除", entryId);
+        return rows;
+    }
+
+    /**
+     * 更新知识条目内容
+     */
+    public int updateEntry(KnowledgeEntry entry) {
+        if (entry == null || entry.getEntryId() == null) {
+            return 0;
+        }
+        entry.setUpdatedAt(java.time.LocalDateTime.now());
+        int rows = knowledgeEntryMapper.updateEntry(entry);
+        log.info("知识条目[{}]已更新", entry.getEntryId());
         return rows;
     }
 
