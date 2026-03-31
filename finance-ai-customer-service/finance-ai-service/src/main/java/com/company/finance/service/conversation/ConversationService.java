@@ -1,6 +1,7 @@
 package com.company.finance.service.conversation;
 
 import com.company.finance.agent.AgentConfig;
+import com.company.finance.common.enums.ChatAction;
 import com.company.finance.agent.tool.ExpenseQueryTool;
 import com.company.finance.agent.tool.ExpenseSubmitTool;
 import com.company.finance.agent.tool.InvoiceVerifyTool;
@@ -403,13 +404,14 @@ public class ConversationService {
         persistMessage(activeSessionId, MessageRole.USER, message, null);
 
         // 3. 判断意图：业务问题走带技能+工具的 chatClient，其他走 plainChatClient
-        return Mono.fromCallable(new Callable<String>() {
+        // 返回 String[]{响应内容, 操作类型}
+        return Mono.fromCallable(new Callable<String[]>() {
                     @Override
-                    public String call() throws Exception {
-                        // 判断是否为业务意图（结合当前消息和会话历史）
+                    public String[] call() throws Exception {
                         if (isBusinessIntent(message) || resolveAgentFromContext(message, activeSessionId) != null) {
                             String instruction = routeToInstruction(message);
-                            log.info("业务意图走 chatClient（技能+工具）: message='{}'", message);
+                            String action = resolveAction(instruction);
+                            log.info("业务意图走 chatClient（技能+工具）: message='{}', action='{}'", message, action);
                             try {
                                 String contextualMessage = buildContextualMessage(activeSessionId, message);
                                 kd.ai.nova.core.model.chat.response.ChatResponse chatResponse = chatClient.request()
@@ -419,20 +421,19 @@ public class ConversationService {
                                 if (chatResponse != null && chatResponse.aiMessage() != null) {
                                     String text = chatResponse.aiMessage().text();
                                     if (text != null && !text.isEmpty()) {
-                                        return text;
+                                        return new String[]{text, action};
                                     }
                                 }
                                 log.warn("chatClient 业务调用返回空响应");
                             } catch (Exception e) {
                                 log.error("chatClient 业务调用异常", e);
                             }
-                            return "抱歉，系统暂时无法查询到相关数据，请稍后重试或联系人工客服（电话：400-888-8888）。";
+                            return new String[]{"抱歉，系统暂时无法查询到相关数据，请稍后重试或联系人工客服（电话：400-888-8888）。", action};
                         }
 
-                        // 非业务意图，用 plainChatClient 直接对话
+                        // 非业务意图
                         log.info("非业务意图: message='{}', sessionId={}, 走 plainChatClient", message, activeSessionId);
                         java.util.List<kd.ai.nova.core.data.message.ChatMessage> historyMessages = buildHistoryMessages(activeSessionId);
-                        log.info("历史消息数量: sessionId={}, count={}", activeSessionId, historyMessages.size());
                         kd.ai.nova.core.model.chat.response.ChatResponse chatResponse = plainChatClient.request()
                                 .system(SYSTEM_PROMPT)
                                 .messages(historyMessages)
@@ -441,23 +442,26 @@ public class ConversationService {
                         if (chatResponse != null && chatResponse.aiMessage() != null) {
                             String text = chatResponse.aiMessage().text();
                             if (text != null && !text.isEmpty()) {
-                                return text;
+                                return new String[]{text, ChatAction.CHAT.getCode()};
                             }
                         }
-                        return "抱歉，系统暂时无法处理您的请求。";
+                        return new String[]{"抱歉，系统暂时无法处理您的请求。", ChatAction.CHAT.getCode()};
                     }
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMapMany(new java.util.function.Function<String, Flux<ServerSentEvent<ChatStreamResponse>>>() {
+                .flatMapMany(new java.util.function.Function<String[], Flux<ServerSentEvent<ChatStreamResponse>>>() {
                     @Override
-                    public Flux<ServerSentEvent<ChatStreamResponse>> apply(String responseContent) {
+                    public Flux<ServerSentEvent<ChatStreamResponse>> apply(String[] result) {
+                        String responseContent = result[0];
+                        String action = result[1];
+
                         // 4. 脱敏处理
                         String maskedContent = dataMaskingService.mask(responseContent);
 
-                        // 5. 持久化 AI 响应并记录审计日志
+                        // 5. 持久化 AI 响应并记录审计日志（使用实际意图分类）
                         persistMessage(activeSessionId, MessageRole.ASSISTANT, responseContent, null);
                         auditLogService.logConversation(
-                                activeSessionId, employeeId, "CHAT",
+                                activeSessionId, employeeId, action,
                                 message, responseContent, maskedContent);
 
                         // 6. 流式输出脱敏后的内容
@@ -685,6 +689,28 @@ public class ConversationService {
             return AgentConfig.GUIDE_INSTRUCTION;
         }
         return SYSTEM_PROMPT;
+    }
+
+    /**
+     * 根据 instruction 反推操作类型枚举值，用于审计日志。
+     */
+    private String resolveAction(String instruction) {
+        if (instruction == AgentConfig.EXPENSE_INSTRUCTION) {
+            return ChatAction.EXPENSE_QUERY.getCode();
+        }
+        if (instruction == AgentConfig.INVOICE_INSTRUCTION) {
+            return ChatAction.INVOICE_VERIFY.getCode();
+        }
+        if (instruction == AgentConfig.SALARY_INSTRUCTION) {
+            return ChatAction.SALARY_QUERY.getCode();
+        }
+        if (instruction == AgentConfig.SUPPLIER_INSTRUCTION) {
+            return ChatAction.SUPPLIER_QUERY.getCode();
+        }
+        if (instruction == AgentConfig.GUIDE_INSTRUCTION) {
+            return ChatAction.GUIDE.getCode();
+        }
+        return ChatAction.CHAT.getCode();
     }
 
     /**
