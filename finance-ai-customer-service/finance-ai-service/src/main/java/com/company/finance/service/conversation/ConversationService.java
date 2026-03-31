@@ -380,8 +380,17 @@ public class ConversationService {
         if (sessionId == null || sessionId.isEmpty()) {
             Session newSession = createSession(employeeId, null);
             activeSessionId = newSession.getSessionId();
+            // 以用户首条消息作为会话标题，超长截取
+            String title = message.length() > 50 ? message.substring(0, 50) + "..." : message;
+            sessionMapper.updateTitle(activeSessionId, title);
         } else {
             activeSessionId = sessionId;
+            // 如果会话还没有标题（旧会话兼容），用本次消息补上
+            Session existing = sessionMapper.selectById(sessionId);
+            if (existing != null && (existing.getTitle() == null || existing.getTitle().isEmpty())) {
+                String title = message.length() > 50 ? message.substring(0, 50) + "..." : message;
+                sessionMapper.updateTitle(sessionId, title);
+            }
         }
 
         // 2. 持久化用户消息
