@@ -71,6 +71,23 @@ public class OperationService {
     }
 
     /**
+     * 统计日期范围内的热点问题（前 20 个高频问题）
+     *
+     * @param startDate 起始日期（包含）
+     * @param endDate   结束日期（包含）
+     * @return 热点问题列表，按频次降序排列，最多 20 条
+     */
+    public List<HotTopic> calculateHotTopics(LocalDate startDate, LocalDate endDate) {
+        AuditLogQuery query = AuditLogQuery.builder()
+                .startTime(startDate.atStartOfDay())
+                .endTime(endDate.atTime(LocalTime.MAX))
+                .build();
+
+        List<AuditLog> logs = auditLogMapper.selectByCondition(query);
+        return calculateHotTopics(logs);
+    }
+
+    /**
      * 统计每日热点问题（前 20 个高频问题）
      * <p>
      * 从审计日志中提取当日所有 CHAT 类型的请求内容，

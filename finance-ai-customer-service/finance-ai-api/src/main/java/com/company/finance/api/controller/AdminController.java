@@ -119,9 +119,11 @@ public class AdminController {
      */
     @GetMapping("/hot-topics")
     public Mono<ResponseEntity<List<HotTopic>>> getHotTopics(
-            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) {
-        LocalDate targetDate = date != null ? date : LocalDate.now();
-        List<HotTopic> hotTopics = operationService.calculateHotTopics(targetDate);
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate) {
+        LocalDate start = startDate != null ? startDate : LocalDate.now();
+        LocalDate end = endDate != null ? endDate : LocalDate.now();
+        List<HotTopic> hotTopics = operationService.calculateHotTopics(start, end);
         return Mono.just(ResponseEntity.ok(hotTopics));
     }
 

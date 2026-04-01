@@ -122,14 +122,15 @@ class AdminControllerTest {
 
     @Test
     void getHotTopicsShouldReturnTopicsForDate() {
-        LocalDate date = LocalDate.of(2024, 6, 1);
+        LocalDate startDate = LocalDate.of(2024, 6, 1);
+        LocalDate endDate = LocalDate.of(2024, 6, 1);
         List<HotTopic> topics = Arrays.asList(
                 new HotTopic("报销查询", 50),
                 new HotTopic("发票验真", 30));
 
-        when(operationService.calculateHotTopics(date)).thenReturn(topics);
+        when(operationService.calculateHotTopics(startDate, endDate)).thenReturn(topics);
 
-        Mono<ResponseEntity<List<HotTopic>>> result = adminController.getHotTopics(date);
+        Mono<ResponseEntity<List<HotTopic>>> result = adminController.getHotTopics(startDate, endDate);
 
         StepVerifier.create(result)
                 .assertNext(response -> {
@@ -143,12 +144,12 @@ class AdminControllerTest {
 
     @Test
     void getHotTopicsShouldDefaultToTodayWhenNoDate() {
-        when(operationService.calculateHotTopics(any(LocalDate.class)))
+        when(operationService.calculateHotTopics(any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(Collections.emptyList());
 
-        adminController.getHotTopics(null).block();
+        adminController.getHotTopics(null, null).block();
 
-        verify(operationService).calculateHotTopics(LocalDate.now());
+        verify(operationService).calculateHotTopics(LocalDate.now(), LocalDate.now());
     }
 
     // ==================== getMetrics ====================
