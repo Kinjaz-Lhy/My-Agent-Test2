@@ -145,9 +145,12 @@ public class OperationService {
      * @return 运营指标
      */
     public OperationMetrics calculateMetrics(LocalDate date) {
-        OperationMetrics existing = operationMetricsMapper.selectByDate(date);
-        if (existing != null) {
-            return existing;
+        // 非当天的数据可以使用缓存，当天数据需要实时计算
+        if (!date.equals(LocalDate.now())) {
+            OperationMetrics existing = operationMetricsMapper.selectByDate(date);
+            if (existing != null) {
+                return existing;
+            }
         }
 
         // 查询当日审计日志
@@ -174,6 +177,13 @@ public class OperationService {
 
         long selfResolvedSessions = totalSessions - humanHandoffSessions;
 
+        // 计算平均响应时间
+        double avgResponseTimeMs = logs.stream()
+                .filter(l -> l.getResponseTimeMs() > 0)
+                .mapToLong(AuditLog::getResponseTimeMs)
+                .average()
+                .orElse(0.0);
+
         // 查询满意度评分
         Double avgScore = satisfactionFeedbackMapper.selectAvgScoreByDateRange(date, date);
 
@@ -188,7 +198,7 @@ public class OperationService {
                 .totalSessions(totalSessions)
                 .selfResolvedSessions(selfResolvedSessions)
                 .humanHandoffSessions(humanHandoffSessions)
-                .avgResponseTimeMs(0)
+                .avgResponseTimeMs(avgResponseTimeMs)
                 .satisfactionScore(avgScore != null ? avgScore : 0.0)
                 .hotTopics(hotTopicsMap)
                 .build();

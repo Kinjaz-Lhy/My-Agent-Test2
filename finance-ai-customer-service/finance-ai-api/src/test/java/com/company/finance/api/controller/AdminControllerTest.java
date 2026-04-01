@@ -3,6 +3,7 @@ package com.company.finance.api.controller;
 import com.company.finance.api.controller.AdminController.ReviewRequest;
 import com.company.finance.api.security.UserPrincipal;
 import com.company.finance.common.dto.AuditLogQuery;
+import com.company.finance.common.dto.DashboardMetrics;
 import com.company.finance.domain.entity.AuditLog;
 import com.company.finance.domain.entity.KnowledgeEntry;
 import com.company.finance.domain.entity.OperationMetrics;
@@ -13,6 +14,7 @@ import com.company.finance.service.knowledge.KnowledgeCategoryService;
 import com.company.finance.service.knowledge.KnowledgeService;
 import com.company.finance.service.operation.OperationService;
 import com.company.finance.service.operation.OperationService.HotTopic;
+import com.company.finance.service.satisfaction.SatisfactionFeedbackService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +46,7 @@ class AdminControllerTest {
     private KnowledgeCategoryService knowledgeCategoryService;
     private KnowledgeService knowledgeService;
     private AutoReplyRuleService autoReplyRuleService;
+    private SatisfactionFeedbackService satisfactionFeedbackService;
     private AdminController adminController;
     private UserPrincipal operatorUser;
 
@@ -54,8 +57,10 @@ class AdminControllerTest {
         knowledgeCategoryService = mock(KnowledgeCategoryService.class);
         knowledgeService = mock(KnowledgeService.class);
         autoReplyRuleService = mock(AutoReplyRuleService.class);
+        satisfactionFeedbackService = mock(SatisfactionFeedbackService.class);
         adminController = new AdminController(
-                auditLogSearchService, operationService, knowledgeCategoryService, knowledgeService, autoReplyRuleService);
+                auditLogSearchService, operationService, knowledgeCategoryService,
+                knowledgeService, autoReplyRuleService, satisfactionFeedbackService);
         operatorUser = new UserPrincipal("OP001", "DEPT-OPS", Collections.singletonList("ROLE_OPERATOR"));
     }
 
@@ -164,15 +169,17 @@ class AdminControllerTest {
                 .satisfactionScore(4.5).build();
 
         when(operationService.calculateMetrics(date)).thenReturn(metrics);
+        when(satisfactionFeedbackService.getAverageScore(any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(4.5);
 
-        Mono<ResponseEntity<OperationMetrics>> result = adminController.getMetrics(date);
+        Mono<ResponseEntity<DashboardMetrics>> result = adminController.getMetrics(date);
 
         StepVerifier.create(result)
                 .assertNext(response -> {
                     assertThat(response.getStatusCodeValue()).isEqualTo(200);
                     assertThat(response.getBody().getTotalSessions()).isEqualTo(100);
-                    assertThat(response.getBody().getSelfResolvedSessions()).isEqualTo(80);
-                    assertThat(response.getBody().getSatisfactionScore()).isEqualTo(4.5);
+                    assertThat(response.getBody().getSelfResolveRate()).isCloseTo(0.8, org.assertj.core.data.Offset.offset(0.01));
+                    assertThat(response.getBody().getHandoffRate()).isCloseTo(0.2, org.assertj.core.data.Offset.offset(0.01));
                 })
                 .verifyComplete();
     }

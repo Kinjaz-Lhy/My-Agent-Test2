@@ -35,7 +35,7 @@ class AuditLogServiceTest {
         auditLogService.logConversation(
                 "sess-001", "EMP001", "CHAT",
                 "我的报销单状态？", "您的报销单已审批通过",
-                "您的报销单已审批通过"
+                "您的报销单已审批通过", 1500
         );
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
@@ -61,8 +61,8 @@ class AuditLogServiceTest {
     void shouldGenerateUniqueLogIdPerCall() {
         when(auditLogMapper.insert(any(AuditLog.class))).thenReturn(1);
 
-        auditLogService.logConversation("s1", "E1", "CHAT", "req1", "resp1", "masked1");
-        auditLogService.logConversation("s2", "E2", "CHAT", "req2", "resp2", "masked2");
+        auditLogService.logConversation("s1", "E1", "CHAT", "req1", "resp1", "masked1", 1000);
+        auditLogService.logConversation("s2", "E2", "CHAT", "req2", "resp2", "masked2", 2000);
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(auditLogMapper, times(2)).insert(captor.capture());
@@ -80,7 +80,7 @@ class AuditLogServiceTest {
         auditLogService.logConversation(
                 "sess-002", "EMP002", "CHAT",
                 "查询工资", "您的工资12000元",
-                "您的工资***元"
+                "您的工资***元", 800
         );
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);

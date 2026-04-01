@@ -14,19 +14,20 @@
         <result property="requestContent" column="request_content"/>
         <result property="responseContent" column="response_content"/>
         <result property="maskedResponseContent" column="masked_response_content"/>
+        <result property="responseTimeMs" column="response_time_ms"/>
         <result property="timestamp" column="timestamp"/>
     </resultMap>
 
     <!-- 插入审计日志 -->
     <insert id="insert">
-        INSERT INTO t_audit_log (log_id, session_id, employee_id, action, request_content, response_content, masked_response_content, timestamp)
+        INSERT INTO t_audit_log (log_id, session_id, employee_id, action, request_content, response_content, masked_response_content, response_time_ms, timestamp)
         VALUES (#{logId}, #{sessionId}, #{employeeId}, #{action},
-                #{requestContent}, #{responseContent}, #{maskedResponseContent}, #{timestamp})
+                #{requestContent}, #{responseContent}, #{maskedResponseContent}, #{responseTimeMs}, #{timestamp})
     </insert>
 
     <!-- 多条件组合查询审计日志（动态 SQL） -->
     <select id="selectByCondition" resultMap="auditLogResultMap">
-        SELECT log_id, session_id, employee_id, action, request_content, response_content, masked_response_content, timestamp
+        SELECT log_id, session_id, employee_id, action, request_content, response_content, masked_response_content, response_time_ms, timestamp
         FROM t_audit_log
         <where>
             <if test="query.startTime != null">

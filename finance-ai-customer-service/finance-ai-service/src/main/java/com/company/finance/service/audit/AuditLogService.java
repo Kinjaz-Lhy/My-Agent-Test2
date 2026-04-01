@@ -44,7 +44,8 @@ public class AuditLogService {
                                 String action,
                                 String requestContent,
                                 String responseContent,
-                                String maskedResponseContent) {
+                                String maskedResponseContent,
+                                long responseTimeMs) {
         AuditLog auditLog = AuditLog.builder()
                 .logId(UUID.randomUUID().toString())
                 .sessionId(sessionId)
@@ -53,6 +54,7 @@ public class AuditLogService {
                 .requestContent(requestContent)
                 .responseContent(responseContent)
                 .maskedResponseContent(maskedResponseContent)
+                .responseTimeMs(responseTimeMs)
                 .timestamp(LocalDateTime.now())
                 .build();
 

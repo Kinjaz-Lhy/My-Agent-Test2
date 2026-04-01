@@ -44,6 +44,9 @@ public class AuditLog {
     /** 脱敏后的响应内容 */
     private String maskedResponseContent;
 
+    /** 响应耗时（毫秒） */
+    private long responseTimeMs;
+
     /** 时间戳 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime timestamp;

@@ -1,7 +1,7 @@
 package com.company.finance.service.conversation;
 
 import com.company.finance.agent.AgentConfig;
-import com.company.finance.common.enums.ChatAction;
+import com.company.finance.common.enums.ChatActionEnum;
 import com.company.finance.agent.tool.ExpenseQueryTool;
 import com.company.finance.agent.tool.ExpenseSubmitTool;
 import com.company.finance.agent.tool.InvoiceVerifyTool;
@@ -157,6 +157,12 @@ public class ConversationService {
                     @Override
                     public void onHandoff(String sessionId, String context) {
                         log.info("触发人工转接: sessionId={}", sessionId);
+                        // 查询会话获取员工 ID，记录转接审计日志
+                        Session session = sessionMapper.selectById(sessionId);
+                        String employeeId = session != null ? session.getEmployeeId() : "UNKNOWN";
+                        auditLogService.logConversation(
+                                sessionId, employeeId, ChatActionEnum.HANDOFF.getCode(),
+                                context, "转接人工客服", "转接人工客服", 0);
                     }
                 }
         );
@@ -417,6 +423,25 @@ public class ConversationService {
         return Mono.fromCallable(new Callable<String[]>() {
                     @Override
                     public String[] call() throws Exception {
+                        long startTime = System.currentTimeMillis();
+
+                        // 用户主动要求转人工
+                        if (isHandoffRequest(message)) {
+                            log.info("用户主动请求转人工: sessionId={}", activeSessionId);
+                            Session session = sessionMapper.selectById(activeSessionId);
+                            String empId = session != null ? session.getEmployeeId() : employeeId;
+                            auditLogService.logConversation(
+                                    activeSessionId, empId, ChatActionEnum.HANDOFF.getCode(),
+                                    message, "转接人工客服", "转接人工客服", 0);
+                            // 更新会话状态为 TRANSFERRED
+                            sessionMapper.updateStatus(activeSessionId, "TRANSFERRED");
+                            long elapsed = System.currentTimeMillis() - startTime;
+                            String handoffReply = "好的，正在为您转接人工客服。财务共享中心人工客服联系方式：" +
+                                    "电话：400-888-8888，服务时间：工作日 9:00-18:00。" +
+                                    "请您稍候，或直接拨打以上电话联系人工客服团队。";
+                            return new String[]{handoffReply, ChatActionEnum.HANDOFF.getCode(), String.valueOf(elapsed)};
+                        }
+
                         if (isBusinessIntent(message) || resolveAgentFromContext(message, activeSessionId) != null) {
                             String instruction = routeToInstruction(message);
                             String action = resolveAction(instruction);
@@ -430,14 +455,16 @@ public class ConversationService {
                                 if (chatResponse != null && chatResponse.aiMessage() != null) {
                                     String text = chatResponse.aiMessage().text();
                                     if (text != null && !text.isEmpty()) {
-                                        return new String[]{text, action};
+                                        long elapsed = System.currentTimeMillis() - startTime;
+                                        return new String[]{text, action, String.valueOf(elapsed)};
                                     }
                                 }
                                 log.warn("chatClient 业务调用返回空响应");
                             } catch (Exception e) {
                                 log.error("chatClient 业务调用异常", e);
                             }
-                            return new String[]{"抱歉，系统暂时无法查询到相关数据，请稍后重试或联系人工客服（电话：400-888-8888）。", action};
+                            long elapsed = System.currentTimeMillis() - startTime;
+                            return new String[]{"抱歉，系统暂时无法查询到相关数据，请稍后重试或联系人工客服（电话：400-888-8888）。", action, String.valueOf(elapsed)};
                         }
 
                         // 非业务意图
@@ -448,13 +475,14 @@ public class ConversationService {
                                 .messages(historyMessages)
                                 .user(message)
                                 .call();
+                        long elapsed = System.currentTimeMillis() - startTime;
                         if (chatResponse != null && chatResponse.aiMessage() != null) {
                             String text = chatResponse.aiMessage().text();
                             if (text != null && !text.isEmpty()) {
-                                return new String[]{text, ChatAction.CHAT.getCode()};
+                                return new String[]{text, ChatActionEnum.CHAT.getCode(), String.valueOf(elapsed)};
                             }
                         }
-                        return new String[]{"抱歉，系统暂时无法处理您的请求。", ChatAction.CHAT.getCode()};
+                        return new String[]{"抱歉，系统暂时无法处理您的请求。", ChatActionEnum.CHAT.getCode(), String.valueOf(elapsed)};
                     }
                 })
                 .subscribeOn(Schedulers.boundedElastic())
@@ -463,15 +491,18 @@ public class ConversationService {
                     public Flux<ServerSentEvent<ChatStreamResponse>> apply(String[] result) {
                         String responseContent = result[0];
                         String action = result[1];
+                        long responseTimeMs = Long.parseLong(result[2]);
 
                         // 4. 脱敏处理
                         String maskedContent = dataMaskingService.mask(responseContent);
 
-                        // 5. 持久化 AI 响应并记录审计日志（使用实际意图分类）
+                        // 5. 持久化 AI 响应并记录审计日志（转人工已在前面记录，跳过）
                         persistMessage(activeSessionId, MessageRole.ASSISTANT, responseContent, null);
-                        auditLogService.logConversation(
-                                activeSessionId, employeeId, action,
-                                message, responseContent, maskedContent);
+                        if (!ChatActionEnum.HANDOFF.getCode().equals(action)) {
+                            auditLogService.logConversation(
+                                    activeSessionId, employeeId, action,
+                                    message, responseContent, maskedContent, responseTimeMs);
+                        }
 
                         // 6. 流式输出脱敏后的内容
                         return streamResponse(activeSessionId, maskedContent);
@@ -535,6 +566,22 @@ public class ConversationService {
             "查询", "提交", "申请", "核对", "验证"
         };
         for (String keyword : businessKeywords) {
+            if (message.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 判断用户消息是否为主动转人工请求
+     */
+    private boolean isHandoffRequest(String message) {
+        if (message == null) {
+            return false;
+        }
+        String[] handoffKeywords = {"转人工", "转接人工", "人工客服", "人工服务", "找人工", "真人客服"};
+        for (String keyword : handoffKeywords) {
             if (message.contains(keyword)) {
                 return true;
             }
@@ -705,21 +752,21 @@ public class ConversationService {
      */
     private String resolveAction(String instruction) {
         if (instruction == AgentConfig.EXPENSE_INSTRUCTION) {
-            return ChatAction.EXPENSE_QUERY.getCode();
+            return ChatActionEnum.EXPENSE_QUERY.getCode();
         }
         if (instruction == AgentConfig.INVOICE_INSTRUCTION) {
-            return ChatAction.INVOICE_VERIFY.getCode();
+            return ChatActionEnum.INVOICE_VERIFY.getCode();
         }
         if (instruction == AgentConfig.SALARY_INSTRUCTION) {
-            return ChatAction.SALARY_QUERY.getCode();
+            return ChatActionEnum.SALARY_QUERY.getCode();
         }
         if (instruction == AgentConfig.SUPPLIER_INSTRUCTION) {
-            return ChatAction.SUPPLIER_QUERY.getCode();
+            return ChatActionEnum.SUPPLIER_QUERY.getCode();
         }
         if (instruction == AgentConfig.GUIDE_INSTRUCTION) {
-            return ChatAction.GUIDE.getCode();
+            return ChatActionEnum.GUIDE.getCode();
         }
-        return ChatAction.CHAT.getCode();
+        return ChatActionEnum.CHAT.getCode();
     }
 
     /**

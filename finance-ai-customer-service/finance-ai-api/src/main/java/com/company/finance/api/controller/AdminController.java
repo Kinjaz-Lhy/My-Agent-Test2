@@ -2,6 +2,8 @@ package com.company.finance.api.controller;
 
 import com.company.finance.api.security.UserPrincipal;
 import com.company.finance.common.dto.AuditLogQuery;
+import com.company.finance.common.dto.DashboardMetrics;
+import com.company.finance.common.dto.DashboardMetrics.SatisfactionTrendItem;
 import com.company.finance.domain.entity.AuditLog;
 import com.company.finance.domain.entity.KnowledgeCategory;
 import com.company.finance.domain.entity.KnowledgeEntry;
@@ -13,6 +15,7 @@ import com.company.finance.service.knowledge.KnowledgeCategoryService;
 import com.company.finance.service.knowledge.KnowledgeService;
 import com.company.finance.service.operation.OperationService;
 import com.company.finance.service.operation.OperationService.HotTopic;
+import com.company.finance.service.satisfaction.SatisfactionFeedbackService;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +35,7 @@ import reactor.core.publisher.Mono;
 import javax.validation.Valid;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -53,17 +57,20 @@ public class AdminController {
     private final KnowledgeCategoryService knowledgeCategoryService;
     private final KnowledgeService knowledgeService;
     private final AutoReplyRuleService autoReplyRuleService;
+    private final SatisfactionFeedbackService satisfactionFeedbackService;
 
     public AdminController(AuditLogSearchService auditLogSearchService,
                            OperationService operationService,
                            KnowledgeCategoryService knowledgeCategoryService,
                            KnowledgeService knowledgeService,
-                           AutoReplyRuleService autoReplyRuleService) {
+                           AutoReplyRuleService autoReplyRuleService,
+                           SatisfactionFeedbackService satisfactionFeedbackService) {
         this.auditLogSearchService = auditLogSearchService;
         this.operationService = operationService;
         this.knowledgeCategoryService = knowledgeCategoryService;
         this.knowledgeService = knowledgeService;
         this.autoReplyRuleService = autoReplyRuleService;
+        this.satisfactionFeedbackService = satisfactionFeedbackService;
     }
 
     private UserPrincipal resolveUser(UserPrincipal user) {
@@ -140,11 +147,35 @@ public class AdminController {
      * @return 运营指标
      */
     @GetMapping("/metrics")
-    public Mono<ResponseEntity<OperationMetrics>> getMetrics(
+    public Mono<ResponseEntity<DashboardMetrics>> getMetrics(
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) {
         LocalDate targetDate = date != null ? date : LocalDate.now();
-        OperationMetrics metrics = operationService.calculateMetrics(targetDate);
-        return Mono.just(ResponseEntity.ok(metrics));
+        OperationMetrics raw = operationService.calculateMetrics(targetDate);
+
+        Double selfResolveRate = 0.0;
+        Double handoffRate = 0.0;
+        if (raw.getTotalSessions() > 0) {
+            selfResolveRate = (double) raw.getSelfResolvedSessions() / raw.getTotalSessions();
+            handoffRate = (double) raw.getHumanHandoffSessions() / raw.getTotalSessions();
+        }
+
+        // 近 7 天满意度趋势
+        List<SatisfactionTrendItem> trend = new ArrayList<>();
+        for (int i = 6; i >= 0; i--) {
+            LocalDate d = targetDate.minusDays(i);
+            Double score = satisfactionFeedbackService.getAverageScore(d, d);
+            trend.add(new SatisfactionTrendItem(d.toString(), score != null ? score : 0.0));
+        }
+
+        DashboardMetrics dashboard = DashboardMetrics.builder()
+                .totalSessions(raw.getTotalSessions())
+                .selfResolveRate(selfResolveRate)
+                .handoffRate(handoffRate)
+                .avgResponseTimeMs(raw.getAvgResponseTimeMs())
+                .satisfactionTrend(trend)
+                .build();
+
+        return Mono.just(ResponseEntity.ok(dashboard));
     }
 
     // ==================== 知识库管理 ====================

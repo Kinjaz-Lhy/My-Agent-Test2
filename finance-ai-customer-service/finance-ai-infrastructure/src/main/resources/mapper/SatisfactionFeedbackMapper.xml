@@ -25,7 +25,7 @@
     <select id="selectAvgScoreByDateRange" resultType="java.lang.Double">
         SELECT AVG(score)
         FROM t_satisfaction_feedback
-        WHERE created_at &gt;= #{start} AND created_at &lt;= #{end}
+        WHERE created_at &gt;= #{start} AND created_at &lt; DATE_ADD(#{end}, INTERVAL 1 DAY)
     </select>
 
     <!-- 根据会话 ID 查询满意度反馈 -->
